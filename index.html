@@ -1249,7 +1249,17 @@ const EMO = n => /chicken|egg|fish|paneer|whey|protein|prawn|tofu|soya|meat/i.te
 /* ============================================================================
    GEMINI — real vision + text analysis (free tier)
    ============================================================================ */
-const GEMINI_MODELS = ['gemini-2.5-flash','gemini-2.0-flash','gemini-flash-latest'];
+const GEMINI_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite'
+];
+let activeGeminiModel = null;
 
 const PROMPT = `You are a nutrition estimator. Analyze the food described or shown.
 Return ONLY minified JSON, no markdown, no code fences, matching exactly:
@@ -1282,7 +1292,10 @@ async function geminiCall(parts, useKey){
       const data = await r.json();
       if(data.error) throw new Error(data.error.message || 'API error');
       const txt = data.candidates?.[0]?.content?.parts?.map(p=>p.text).filter(Boolean).join('') || '';
-      return parseJSON(txt);
+      const parsed = parseJSON(txt);
+      activeGeminiModel = model;
+      renderApiStatus();
+      return parsed;
     }catch(e){ lastErr = e; }
   }
   throw lastErr || new Error('all models failed');
@@ -1511,7 +1524,7 @@ function renderApiStatus(){
   const set = !!S.apiKey;
   el.innerHTML = `
     <div class="lic"><span class="k">Provider</span><span class="v">Gemini</span></div>
-    <div class="lic"><span class="k">Model</span><span class="v" style="font-size:13px">2.5 Flash</span></div>
+    <div class="lic"><span class="k">Model</span><span class="v" style="font-size:13px">${activeGeminiModel || GEMINI_MODELS[0]}</span></div>
     <div class="lic"><span class="k">Key</span><span class="v" style="color:${set?'var(--ok)':'var(--t3)'}">${set?'connected':'offline mode'}</span></div>`;
   const kb=$('#keyBadge');
   if(kb){ kb.textContent = set?'connected':'not set'; kb.className = 'badge sp '+(set?'bg-Pull':'bg-Rest'); }
