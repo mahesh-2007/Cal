@@ -476,6 +476,7 @@ details summary:hover{color:var(--t1)}
           <div class="lic"><span class="k">Eaten</span><span class="v" id="sEat">0</span></div>
           <div class="lic"><span class="k">Burned</span><span class="v" id="sBurn">0</span></div>
           <div class="lic"><span class="k">Net</span><span class="v" id="sNet">0</span></div>
+          <div class="lic"><span class="k">Remaining</span><span class="v" id="sRemain">0</span></div>
           <div class="lic"><span class="k">Streak</span><span class="v" id="sStreak">0 d</span></div>
         </div>
 
@@ -818,6 +819,7 @@ details summary:hover{color:var(--t1)}
           <div class="notice" style="margin-bottom:16px">
             Keep your meals, workouts, water, weight, goals and saved meals in a private Google Drive app-data file.
             Your data stays separate from this website's code and can be restored after an update.
+            On mobile, tap the Settings gear at the top right and scroll to this section. After the one-time setup below, changes sync automatically while Google Drive is connected; returning visits try to reconnect and load your Drive data.
           </div>
           <div class="field">
             <label class="lbl">Google OAuth client ID</label>
@@ -830,7 +832,16 @@ details summary:hover{color:var(--t1)}
           <button class="btn full" id="driveSave" style="margin-top:10px">Save to Drive</button>
           <div class="step" id="driveStep"></div>
           <div class="notice" style="margin-top:16px;font-size:12px">
-            <b>Setup:</b> Create a Google Cloud OAuth web client, add your GitHub Pages URL as an authorized JavaScript origin, then paste its client ID here. The app uses Drive's private <b>appDataFolder</b>; it does not create a public file.
+            <b>Connect Google Drive</b>
+            <ol style="padding-left:20px;margin-top:8px;line-height:1.7">
+              <li>Open the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a> and create or select a project.</li>
+              <li>Enable the <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener">Google Drive API</a>.</li>
+              <li>Configure the OAuth consent screen. Choose External for a personal Google account and add your account as a test user if the app is still in testing.</li>
+              <li>In <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Credentials</a>, create an OAuth client ID with application type <b>Web application</b>.</li>
+              <li>Add your site's origin under <b>Authorized JavaScript origins</b> (for example, <code>https://username.github.io</code>). For local testing, add the exact <code>http://localhost:PORT</code> origin you use. Do not include a page path.</li>
+              <li>Copy the client ID, paste it above, and select <b>Connect Google</b>. Approve access, then use <b>Save to Drive</b> or <b>Load from Drive</b>.</li>
+            </ol>
+            <p style="margin-top:8px">This app stores data in your private Drive <b>appDataFolder</b>, not as a public file. Google sign-in requires a hosted HTTPS site or localhost; opening this HTML directly as a <code>file://</code> URL will not work.</p>
           </div>
         </div>
         <div class="card">
@@ -1044,7 +1055,13 @@ function trySilentDriveConnect(){
   const client=google.accounts.oauth2.initTokenClient({client_id:S.driveClientId,scope:'https://www.googleapis.com/auth/drive.appdata',prompt:'',callback:async response=>{
     if(response.error) return;
     driveAccessToken=response.access_token; updateDriveBadge(true);
-    try{ await driveLoad(); driveMessage('Drive sync is active.'); }catch(e){ driveMessage(e.message); }
+    try{ await driveLoad(); driveMessage('Drive sync is active.'); }
+    catch(e){
+      if(e.message.includes('No Cal data')){
+        try{ await driveUpload(); driveMessage('Drive sync is active. Your local data was backed up.'); }
+        catch(uploadError){ driveMessage(uploadError.message); }
+      } else driveMessage(e.message);
+    }
   }});
   client.requestAccessToken({prompt:''});
 }
@@ -1434,6 +1451,7 @@ function renderHome(){
   $('#sEat').textContent = num(t.kcal);
   $('#sBurn').textContent = num(burn);
   $('#sNet').textContent = num(t.kcal - burn);
+  $('#sRemain').textContent = num(remain);
   $('#sStreak').textContent = streak()+' d';
 
   // session card
