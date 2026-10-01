@@ -316,10 +316,10 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 #toast{
   position:fixed;left:50%;bottom:100px;transform:translate(-50%,80px);
   background:var(--surf3);color:var(--t1);border-radius:16px;padding:14px 22px;
-  font-size:14px;font-weight:600;z-index:99;transition:transform .3s cubic-bezier(.3,1.3,.5,1);
-  display:flex;align-items:center;gap:10px;max-width:88vw;text-align:left;
+  font-size:14px;font-weight:600;z-index:99;transition:transform .3s cubic-bezier(.3,1.3,.5,1),opacity .2s;
+  display:flex;align-items:center;gap:10px;max-width:88vw;text-align:left;opacity:0;pointer-events:none;
 }
-#toast.on{transform:translate(-50%,0)}
+#toast.on{transform:translate(-50%,0);opacity:1;pointer-events:auto}
 @media(min-width:760px){#toast{bottom:28px}}
 
 /* ---------- misc ---------- */
@@ -660,8 +660,8 @@ details summary:hover{color:var(--t1)}
         </div>
 
         <div class="card sm">
-          <div class="card-hd" style="margin-bottom:12px"><div class="h5" style="font-size:14px">Burn model</div></div>
-          <p class="body" style="font-size:13px">kcal ≈ weight × hours × MET × intensity. Push/Pull ≈ 6.0, Legs ≈ 7.0 MET.</p>
+          <div class="card-hd" style="margin-bottom:12px"><div class="h5" style="font-size:14px">Burn estimate</div></div>
+          <p class="body" style="font-size:13px">Estimated from workout type, duration, intensity and your body weight. Today's estimate updates when you change your weight or log a different workout.</p>
           <div class="f2" style="margin-top:14px">
             <div class="field" style="margin:0">
               <label class="lbl">Weight (kg)</label>
@@ -1402,7 +1402,8 @@ function setRing(el, val, max){
 
 function renderHome(){
   const k=TODAY(), d=D(k), t=eaten(k), g=S.goals;
-  const burn = d.workout ? d.workout.burn : 0;
+  const burn = estimateWorkoutBurn(d.workout);
+  if(d.workout){ d.workout.burn=burn; d.workout.weightKg=S.weight; }
   const remain = Math.round(g.k - t.kcal + burn);
 
   $('#todayLabel').textContent = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
@@ -1783,15 +1784,21 @@ $('#resetBtn').onclick = () => {
   $('#startBtn').textContent = 'Start';
 };
 const MET = t => t==='Legs' ? 7.0 : 6.0;
+function estimateWorkoutBurn(workout, weightKg=S.weight){
+  if(!workout) return 0;
+  return Math.round(weightKg*(Number(workout.min)||0)/60*MET(workout.type)*(Number(workout.intensity)||1));
+}
 $('#saveWo').onclick = () => {
   if(!pick){ toast('Choose a split','⚠️'); return; }
   const manual = parseFloat($('#manMin').value);
   const mins = manual>0 ? manual : Math.round(S.timer.sec/60);
   if(!mins || mins<1){ toast('Start the timer or enter minutes','⚠️'); return; }
   const inten = parseFloat($('#intensity').value);
-  const burn = S.weight*(mins/60)*MET(pick)*inten;
-  today().workout = {type:pick, min:Math.round(mins), burn, intensity:inten, notes:$('#notes').value.trim(), exercises:[...exerciseDraft],
-                     at:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})};
+  const workout = {type:pick, min:Math.round(mins), intensity:inten, weightKg:S.weight, notes:$('#notes').value.trim(), exercises:[...exerciseDraft],
+                   at:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})};
+  const burn = estimateWorkoutBurn(workout);
+  workout.burn = burn;
+  today().workout = workout;
   clearInterval(S.timer.id); S.timer={on:false,sec:0,id:null,type:pick};
   $('#tBig').textContent='00:00:00'; $('#timerBox').classList.remove('on');
   $('#manMin').value=''; $('#notes').value='';
@@ -1810,7 +1817,7 @@ function renderTrain(){
   const n = wk.filter(k=>S.days[k]&&S.days[k].workout).length;
   $('#wSess').textContent = d.workout ? d.workout.type : '—';
   $('#wDur').textContent  = (d.workout?d.workout.min:0)+' min';
-  $('#wBurn').textContent = num(d.workout?d.workout.burn:0)+' kcal';
+  $('#wBurn').textContent = num(estimateWorkoutBurn(d.workout))+' kcal';
   $('#wWeek').textContent = n+' / '+S.weekGoal;
 
   const rows = Object.keys(S.days).filter(k=>S.days[k].workout).sort().reverse().slice(0,12);
@@ -2035,7 +2042,7 @@ window.addWeight = () => {
   S.weights.push({k:TODAY(), w:v});
   if(S.weights.length>60) S.weights.shift();
   S.weight = v; $('#wtIn').value=''; $('#setW').value = v; $('#bodyW').value = v;
-  saveState(); renderCoach(); toast('Weight logged','⚖');
+  renderAll(); toast('Weight logged','⚖');
 };
 
 let quickMeals = [];
@@ -2181,7 +2188,7 @@ $('#saveBody').onclick = () => {
   $('#bodyW').value = S.weight;
   renderAll(); toast('Body data saved','✓');
 };
-$('#bodyW').onchange = e => { S.weight = +e.target.value||70; $('#setW').value = S.weight; saveState(); renderTrain(); };
+$('#bodyW').onchange = e => { S.weight = +e.target.value||70; $('#setW').value = S.weight; renderAll(); };
 $('#weekGoal').onchange = e => { S.weekGoal = +e.target.value||5; renderAll(); };
 $('#resetAll').onclick = () => {
   S.days={}; S.saved=[]; S.routines=[]; S.recent=[]; S.weights=[]; S.weekOffset=0;
