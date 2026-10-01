@@ -232,6 +232,17 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 
 /* ---------- week strip ---------- */
 .week{display:grid;grid-template-columns:repeat(7,1fr);gap:7px}
+.steps-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.steps-calendar .day-head{padding:4px 0;text-align:center;font-size:10px;font-weight:700;color:var(--t3)}
+.step-day{min-width:0;min-height:58px;padding:6px 2px;border:1px solid var(--divider);border-radius:9px;background:var(--surf2);color:var(--t1);font-family:inherit;display:flex;flex-direction:column;justify-content:space-between;align-items:center;cursor:pointer}
+.step-day:hover{background:var(--surf3)}
+.step-day:disabled{opacity:.3;cursor:not-allowed}
+.step-day.today{border-color:var(--t1)}
+.step-day.selected{background:var(--t1);color:#000}
+.step-day .sdn{font-size:11px;font-weight:700}
+.step-day .sdc{font-size:9px;font-weight:600;color:var(--t2);white-space:nowrap}
+.step-day.selected .sdc{color:#555}
+.step-day.blank{visibility:hidden}
 .wd{background:var(--surf2);border-radius:14px;padding:11px 3px;text-align:center}
 .wd .dw{font-size:10px;font-weight:700;letter-spacing:.6px;color:var(--t3);text-transform:uppercase}
 .wd .dn{font-size:16px;font-weight:700;margin:5px 0 7px;letter-spacing:-.2px}
@@ -458,6 +469,13 @@ details summary:hover{color:var(--t1)}
           </div>
         </div>
 
+        <div class="card sm">
+          <div class="card-hd" style="margin-bottom:10px"><div class="h5">Steps today</div></div>
+          <div class="lic"><span class="k">Steps</span><span class="v" id="homeSteps">0</span></div>
+          <div class="lic"><span class="k">Estimated walking burn</span><span class="v" id="homeStepBurn">0 kcal</span></div>
+          <button class="btn sm full" style="margin-top:10px" onclick="go('week')">Log steps / view calendar</button>
+        </div>
+
         <div class="card" id="todaySessionCard"></div>
 
         <div class="card">
@@ -474,7 +492,7 @@ details summary:hover{color:var(--t1)}
         <div class="card sm">
           <div class="lbl" style="margin-bottom:12px">Balance</div>
           <div class="lic"><span class="k">Eaten</span><span class="v" id="sEat">0</span></div>
-          <div class="lic"><span class="k">Burned</span><span class="v" id="sBurn">0</span></div>
+          <div class="lic"><span class="k">Activity burn</span><span class="v" id="sBurn">0</span></div>
           <div class="lic"><span class="k">Net</span><span class="v" id="sNet">0</span></div>
           <div class="lic"><span class="k">Remaining</span><span class="v" id="sRemain">0</span></div>
           <div class="lic"><span class="k">Streak</span><span class="v" id="sStreak">0 d</span></div>
@@ -718,6 +736,34 @@ details summary:hover{color:var(--t1)}
         </div>
       </div>
 
+      <div class="card lg">
+        <div class="card-hd">
+          <div><div class="h4">Steps</div><div class="meta" id="stepsMonthLabel">—</div></div>
+          <div class="btn-row sp">
+            <button class="btn sm" onclick="shiftStepMonth(-1)" title="Previous month" aria-label="Previous month">‹</button>
+            <button class="btn sm" onclick="shiftStepMonth(1)" title="Next month" aria-label="Next month">›</button>
+          </div>
+        </div>
+        <div class="f3" style="margin-bottom:16px">
+          <div class="tile"><div class="lbl">Steps this month</div><div class="v" id="stepsMonthTotal">0</div></div>
+          <div class="tile"><div class="lbl">Estimated burn</div><div class="v" id="stepsMonthBurn">0<small>kcal</small></div></div>
+          <div class="tile"><div class="lbl">Days logged</div><div class="v" id="stepsMonthDays">0</div></div>
+        </div>
+        <div class="steps-calendar" id="stepsCalendar"></div>
+        <div class="divider"></div>
+        <div class="card-hd" style="margin-bottom:10px"><div class="h5" style="font-size:15px">Log daily steps</div></div>
+        <div class="f2">
+          <div class="field"><label class="lbl" for="stepDate">Date</label><input type="date" id="stepDate"></div>
+          <div class="field"><label class="lbl" for="stepsIn">Steps</label><input type="number" id="stepsIn" placeholder="e.g. 7500" min="0" max="200000" step="1" inputmode="numeric"></div>
+        </div>
+        <div class="meta" id="stepCurrent" style="margin:-4px 0 12px">Current total: 0 steps</div>
+        <div class="btn-row">
+          <button class="btn pri full" id="saveSteps">Set daily total</button>
+          <button class="btn full" id="addSteps">Add steps</button>
+        </div>
+        <p class="meta" style="font-size:12px;margin-top:12px">Walking calories are estimates using your height-derived stride and current weight. They are added to workout burn in Today’s balance, so steps during a logged workout may overlap.</p>
+      </div>
+
       <div class="card">
         <div class="card-hd"><div class="h5">Sessions</div></div>
         <div class="rows" id="weekLog"></div>
@@ -832,8 +878,8 @@ details summary:hover{color:var(--t1)}
           <button class="btn full" id="driveSave" style="margin-top:10px">Save to Drive</button>
           <div class="step" id="driveStep"></div>
           <div class="notice" style="margin-top:16px;font-size:12px">
-            <b>Connect Google Drive</b>
-            <ol style="padding-left:20px;margin-top:8px;line-height:1.7">
+            <b>Google Drive setup: 6 steps</b>
+            <ol style="list-style-type:decimal;list-style-position:inside;padding-left:0;margin-top:8px;line-height:1.7">
               <li>Open the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a> and create or select a project.</li>
               <li>Enable the <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener">Google Drive API</a>.</li>
               <li>Configure the OAuth consent screen. Choose External for a personal Google account and add your account as a test user if the app is still in testing.</li>
@@ -888,6 +934,7 @@ details summary:hover{color:var(--t1)}
           <div class="f2">
             <div class="field"><label class="lbl">Current (kg)</label><input type="number" id="setW" value="70" step="0.1"></div>
             <div class="field"><label class="lbl">Target (kg)</label><input type="number" id="setTW" value="65" step="0.1"></div>
+            <div class="field"><label class="lbl">Height (cm)</label><input type="number" id="setH" value="170" min="100" max="250" step="0.5"></div>
           </div>
           <div class="btn-row">
             <button class="btn sm full" id="saveBody">Save</button>
@@ -936,7 +983,7 @@ details summary:hover{color:var(--t1)}
   ============================================================================ */
 const S = {
   goals:{k:2200,p:150,c:240,f:70},
-  weight:70, targetWeight:65, weekGoal:5,
+  weight:70, heightCm:170, targetWeight:65, weekGoal:5,
   apiKey:'',
   days:{},                  // 'YYYY-MM-DD' -> {meals:[], workout:null, water:0}
   saved:[],                 // saved meals
@@ -957,7 +1004,7 @@ let driveSaveTimer = null;
 function saveState(syncDrive=true){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      goals:S.goals, weight:S.weight, targetWeight:S.targetWeight, weekGoal:S.weekGoal,
+      goals:S.goals, weight:S.weight, heightCm:S.heightCm, targetWeight:S.targetWeight, weekGoal:S.weekGoal,
       apiKey:S.apiKey, days:S.days, saved:S.saved, routines:S.routines, recent:S.recent, weights:S.weights,
       weekOffset:S.weekOffset, driveClientId:S.driveClientId, driveFileId:S.driveFileId
     }));
@@ -975,6 +1022,7 @@ function loadState(){
     if(!saved || typeof saved !== 'object') return false;
     S.goals = {...S.goals, ...(saved.goals || {})};
     S.weight = Number(saved.weight) || S.weight;
+    S.heightCm = Number(saved.heightCm) || S.heightCm;
     S.targetWeight = Number(saved.targetWeight) || S.targetWeight;
     S.weekGoal = Number(saved.weekGoal) || S.weekGoal;
     S.apiKey = typeof saved.apiKey === 'string' ? saved.apiKey : '';
@@ -994,7 +1042,7 @@ function loadState(){
 }
 
 function cloudData(){
-  return {schemaVersion:1, updatedAt:new Date().toISOString(), goals:S.goals, weight:S.weight,
+  return {schemaVersion:1, updatedAt:new Date().toISOString(), goals:S.goals, weight:S.weight, heightCm:S.heightCm,
     targetWeight:S.targetWeight, weekGoal:S.weekGoal, days:S.days, saved:S.saved,
     recent:S.recent, weights:S.weights, routines:S.routines};
 }
@@ -1004,6 +1052,7 @@ function applyCloudData(data){
   localStorage.setItem(STORAGE_KEY+'.backup', localStorage.getItem(STORAGE_KEY) || '');
   S.goals = {...S.goals, ...(data.goals || {})};
   S.weight = Number(data.weight) || S.weight;
+  S.heightCm = Number(data.heightCm) || S.heightCm;
   S.targetWeight = Number(data.targetWeight) || S.targetWeight;
   S.weekGoal = Number(data.weekGoal) || S.weekGoal;
   S.days = data.days && typeof data.days === 'object' ? data.days : {};
@@ -1103,7 +1152,7 @@ $('#driveSave').onclick=async()=>{ if(!driveAccessToken){ driveMessage('Connect 
 const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const dkey = d => { const x = new Date(d); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); };
 const TODAY = () => dkey(new Date());
-function D(k){ if(!S.days[k]) S.days[k]={meals:[],workout:null,water:0}; return S.days[k]; }
+function D(k){ if(!S.days[k]) S.days[k]={meals:[],workout:null,water:0,steps:0}; return S.days[k]; }
 const today = () => D(TODAY());
 const num = n => Math.round(n).toLocaleString('en-US');
 
@@ -1432,13 +1481,15 @@ function setRing(el, val, max){
 
 function renderHome(){
   const k=TODAY(), d=D(k), t=eaten(k), g=S.goals;
-  const burn = estimateWorkoutBurn(d.workout);
-  if(d.workout){ d.workout.burn=burn; d.workout.weightKg=S.weight; }
+  const workoutBurn = estimateWorkoutBurn(d.workout);
+  const stepBurn = estimateStepBurn(d.steps,S.weight,S.heightCm);
+  const burn = workoutBurn + stepBurn;
+  if(d.workout){ d.workout.burn=workoutBurn; d.workout.weightKg=S.weight; }
   const remain = Math.round(g.k - t.kcal + burn);
 
   $('#todayLabel').textContent = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   $('#heroRemain').textContent = num(remain);
-  $('#heroSub').textContent = `${num(t.kcal)} eaten · ${num(burn)} burned of ${num(g.k)} kcal`;
+  $('#heroSub').textContent = `${num(t.kcal)} eaten · ${num(burn)} activity kcal burned of ${num(g.k)} kcal`;
   const p = Math.max(0, Math.min(t.kcal/g.k,1))*100;
   const prog = $('#heroProg');
   prog.querySelector('div').style.width = p+'%';
@@ -1453,6 +1504,8 @@ function renderHome(){
   $('#sNet').textContent = num(t.kcal - burn);
   $('#sRemain').textContent = num(remain);
   $('#sStreak').textContent = streak()+' d';
+  $('#homeSteps').textContent = num(Number(d.steps)||0);
+  $('#homeStepBurn').textContent = num(stepBurn)+' kcal';
 
   // session card
   const box = $('#todaySessionCard');
@@ -1819,6 +1872,11 @@ function estimateWorkoutBurn(workout, weightKg=S.weight){
   if(!workout) return 0;
   return Math.round(weightKg*(Number(workout.min)||0)/60*MET(workout.type)*(Number(workout.intensity)||1));
 }
+function estimateStepBurn(steps, weightKg=S.weight, heightCm=S.heightCm){
+  const strideMeters = (Number(heightCm)||170)*0.00415;
+  const distanceKm = Math.max(0,Number(steps)||0)*strideMeters/1000;
+  return Math.round((Number(weightKg)||70)*distanceKm*0.5);
+}
 $('#saveWo').onclick = () => {
   if(!pick){ toast('Choose a split','⚠️'); return; }
   const manual = parseFloat($('#manMin').value);
@@ -1902,7 +1960,58 @@ function suggestNext(){
 /* ============================================================================
    WEEK
    ============================================================================ */
+let stepsMonthOffset = 0;
 window.shiftWeek = n => { S.weekOffset += n; renderWeek(); };
+window.shiftStepMonth = n => { stepsMonthOffset += n; renderStepsCalendar(); };
+window.selectStepDate = k => {
+  if(k>TODAY()) return;
+  $('#stepDate').value=k;
+  $('#stepsIn').value='';
+  updateStepDateDisplay();
+  renderStepsCalendar();
+};
+function updateStepDateDisplay(){
+  const k=$('#stepDate').value || TODAY(), steps=Number(D(k).steps)||0;
+  $('#stepCurrent').textContent=`Current total: ${num(steps)} steps`;
+}
+function saveStepCount(additive){
+  const k=$('#stepDate').value, count=Number($('#stepsIn').value);
+  if(!k || k>TODAY()){ toast('Choose today or an earlier date'); return; }
+  if($('#stepsIn').value==='' || !Number.isInteger(count) || count<0 || count>200000){ toast('Enter a valid step count'); return; }
+  const day=D(k), previous=Number(day.steps)||0;
+  day.steps=additive ? Math.min(200000,previous+count) : count;
+  $('#stepsIn').value='';
+  renderAll(); updateStepDateDisplay();
+  toast(additive?'Steps added to the daily total':'Daily step total saved','✓');
+}
+$('#stepDate').onchange=()=>{ $('#stepsIn').value=''; updateStepDateDisplay(); renderStepsCalendar(); };
+$('#saveSteps').onclick=()=>saveStepCount(false);
+$('#addSteps').onclick=()=>saveStepCount(true);
+function renderStepsCalendar(){
+  const now=new Date(), month=new Date(now.getFullYear(),now.getMonth()+stepsMonthOffset,1,12);
+  const year=month.getFullYear(), monthIndex=month.getMonth(), daysInMonth=new Date(year,monthIndex+1,0).getDate();
+  const leading=(month.getDay()+6)%7, firstOfMonth=dkey(month), lastOfMonth=dkey(new Date(year,monthIndex,daysInMonth,12));
+  $('#stepsMonthLabel').textContent=month.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  let total=0,burn=0,logged=0;
+  Object.keys(S.days).forEach(k=>{
+    if(k<firstOfMonth || k>lastOfMonth) return;
+    const steps=Number(S.days[k].steps)||0;
+    if(steps>0){ total+=steps; burn+=estimateStepBurn(steps,S.weight,S.heightCm); logged++; }
+  });
+  $('#stepsMonthTotal').textContent=num(total);
+  $('#stepsMonthBurn').innerHTML=`${num(burn)}<small>kcal</small>`;
+  $('#stepsMonthDays').textContent=logged;
+  const headings=['M','T','W','T','F','S','S'].map(day=>`<div class="day-head">${day}</div>`).join('');
+  const blanks=Array.from({length:leading},()=>'<div class="step-day blank" aria-hidden="true"></div>').join('');
+  const cells=Array.from({length:daysInMonth},(_,i)=>{
+    const day=i+1, k=dkey(new Date(year,monthIndex,day,12)), steps=Number(S.days[k]?.steps)||0;
+    const burn=steps?estimateStepBurn(steps,S.weight,S.heightCm):0;
+    const classes=['step-day',k===TODAY()?'today':'',k===$('#stepDate').value?'selected':''].filter(Boolean).join(' ');
+    const count=steps>=10000?`${(steps/1000).toFixed(0)}k`:steps>=1000?`${(steps/1000).toFixed(1)}k`:String(steps||'—');
+    return `<button class="${classes}" type="button" ${k>TODAY()?'disabled':''} title="${num(steps)} steps · ${num(burn)} estimated kcal" onclick="selectStepDate('${k}')"><span class="sdn">${day}</span><span class="sdc">${count}</span></button>`;
+  }).join('');
+  $('#stepsCalendar').innerHTML=headings+blanks+cells;
+}
 function renderWeek(){
   const keys = weekKeys(S.weekOffset), names=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const tk = TODAY();
@@ -1931,18 +2040,19 @@ function renderWeek(){
   $('#cR').textContent = 7-cP-cU-cL; $('#cM').textContent = num(min);
   $('#cK').textContent = logged ? num(kcal/logged) : 0;
 
-  const rows = keys.filter(k=>S.days[k]&&(S.days[k].workout||S.days[k].meals.length)).reverse();
+  const rows = keys.filter(k=>S.days[k]&&(S.days[k].workout||S.days[k].meals.length||S.days[k].steps)).reverse();
   $('#weekLog').innerHTML = rows.length ? rows.map(k=>{
     const d=S.days[k], w=d.workout, t=eaten(k);
     return `<div class="row">
       <div class="aw">${w?(w.type==='Push'?'💪':w.type==='Pull'?'🎯':'🦵'):'🍽'}</div>
       <div class="main">
-        <div class="nm" style="font-size:15px">${w?w.type+' day':'Nutrition only'} <span class="meta" style="font-weight:500">· ${nice(k)}</span></div>
-        <div class="ms">${w?`${w.min} min · ~${num(w.burn)} kcal burned · `:''}${num(t.kcal)} kcal eaten</div>
+        <div class="nm" style="font-size:15px">${w?w.type+' day':d.meals.length?'Nutrition only':'Steps'} <span class="meta" style="font-weight:500">· ${nice(k)}</span></div>
+        <div class="ms">${w?`${w.min} min · ~${num(w.burn)} workout kcal · `:''}${d.steps?`${num(d.steps)} steps · ~${num(estimateStepBurn(d.steps,S.weight,S.heightCm))} kcal walking · `:''}${num(t.kcal)} kcal eaten</div>
       </div>
       ${w?`<span class="badge bg-${w.type}">${w.min}m</span>`:''}
     </div>`;
   }).join('') : `<div class="empty"><span class="ic">📅</span><div class="tx">Nothing logged this week</div></div>`;
+  renderStepsCalendar();
 }
 
 /* ============================================================================
@@ -1950,7 +2060,8 @@ function renderWeek(){
    ============================================================================ */
 function renderCoach(){
   const k=TODAY(), d=today(), t=eaten(k), g=S.goals;
-  const burn = d.workout ? d.workout.burn : 0;
+  const workoutBurn = estimateWorkoutBurn(d.workout);
+  const burn = workoutBurn + estimateStepBurn(d.steps,S.weight,S.heightCm);
   const remain = Math.round(g.k - t.kcal + burn);
   const pLeft = Math.max(0, g.p - t.protein);
   const wk = weekKeys(0);
@@ -1961,7 +2072,7 @@ function renderCoach(){
     : 'No meals logged yet, so nutrition variety is still unknown.';
 
   let trainLine = d.workout
-    ? `You logged <b>${d.workout.type}</b> for ${d.workout.min} minutes, roughly <b>${num(burn)} kcal</b> burned. Next in the rotation is <b>${d.workout.type==='Push'?'Pull':d.workout.type==='Pull'?'Legs':'Push'}</b>.`
+    ? `You logged <b>${d.workout.type}</b> for ${d.workout.min} minutes, roughly <b>${num(workoutBurn)} kcal</b> burned. Next in the rotation is <b>${d.workout.type==='Push'?'Pull':d.workout.type==='Pull'?'Legs':'Push'}</b>.`
     : `No session logged yet today. Based on your history, <b>${suggestNext()}</b> is next in the rotation.`;
 
   $('#briefing').innerHTML = `
@@ -2152,14 +2263,17 @@ $('#saveCustomMeal').onclick = () => {
    ============================================================================ */
 function answer(q){
   const s = q.toLowerCase(), k=TODAY(), d=today(), t=eaten(k), g=S.goals;
-  const burn = d.workout?d.workout.burn:0, remain = Math.round(g.k-(t.kcal-burn)), pLeft = Math.round(g.p-t.protein);
+  const workoutBurn = estimateWorkoutBurn(d.workout), stepBurn = estimateStepBurn(d.steps,S.weight,S.heightCm);
+  const burn = workoutBurn + stepBurn, remain = Math.round(g.k-(t.kcal-burn)), pLeft = Math.round(g.p-t.protein);
   if(/calorie|kcal|left|remain/.test(s))
-    return `You've eaten <b>${num(t.kcal)} kcal</b> and burned about <b>${num(burn)} kcal</b>. Net is <b>${num(t.kcal-burn)}</b>, leaving <b>${num(remain)} kcal</b> today.`;
+    return `You've eaten <b>${num(t.kcal)} kcal</b> and your estimated activity burn is <b>${num(burn)} kcal</b> (${num(workoutBurn)} workout + ${num(stepBurn)} walking). Net is <b>${num(t.kcal-burn)}</b>, leaving <b>${num(remain)} kcal</b> today.`;
   if(/protein/.test(s))
     return t.protein>=g.p ? `Protein is done — <b>${Math.round(t.protein)}g</b> against a ${g.p}g target.`
       : `You're at <b>${Math.round(t.protein)}g</b> of ${g.p}g. <b>${pLeft}g</b> to go: a whey scoop (~25g), 200g curd (~11g) or three eggs (~19g).`;
+  if(/steps?|walk|walking/.test(s))
+    return `You've logged <b>${num(Number(d.steps)||0)} steps</b> today, for about <b>${num(stepBurn)} kcal</b> estimated walking burn using your ${S.weight} kg weight and ${S.heightCm} cm height.`;
   if(/train|workout|gym|lift/.test(s))
-    return d.workout ? `You already trained <b>${d.workout.type}</b> for ${d.workout.min} min (~${num(burn)} kcal). ${d.workout.min<30?'That is on the short side — 40–60 min covers more volume.':'Good duration range.'}`
+    return d.workout ? `You already trained <b>${d.workout.type}</b> for ${d.workout.min} min (~${num(workoutBurn)} kcal). ${d.workout.min<30?'That is on the short side — 40–60 min covers more volume.':'Good duration range.'}`
       : `Nothing logged today. <b>${suggestNext()}</b> is next in your rotation — 45–60 min is the sweet spot.`;
   if(/week|split|push|pull|legs|balance/.test(s)){
     const wk=weekKeys(0); let c={Push:0,Pull:0,Legs:0};
@@ -2216,6 +2330,7 @@ $('#saveGoals').onclick = () => {
 };
 $('#saveBody').onclick = () => {
   S.weight = +$('#setW').value||70; S.targetWeight = +$('#setTW').value||65;
+  S.heightCm = Math.min(250,Math.max(100,+$('#setH').value||170));
   $('#bodyW').value = S.weight;
   renderAll(); toast('Body data saved','✓');
 };
@@ -2247,9 +2362,10 @@ if(!loadState()) saveState();
 function renderAll(){ renderHome(); renderTrain(); renderWeek(); renderRecent(); renderCoach(); renderLibrary(); renderApiStatus(); saveState(); }
 renderAll();
 $('#gK').value=S.goals.k; $('#gP').value=S.goals.p; $('#gC').value=S.goals.c; $('#gF').value=S.goals.f;
-$('#bodyW').value=S.weight; $('#setW').value=S.weight; $('#setTW').value=S.targetWeight;
+$('#bodyW').value=S.weight; $('#setW').value=S.weight; $('#setTW').value=S.targetWeight; $('#setH').value=S.heightCm;
 $('#driveClientId').value=S.driveClientId || DEFAULT_DRIVE_CLIENT_ID;
 $('#mealDate').value=TODAY(); $('#mealDate').max=TODAY();
+$('#stepDate').value=TODAY(); $('#stepDate').max=TODAY(); updateStepDateDisplay(); renderStepsCalendar();
 window.addEventListener('load', trySilentDriveConnect);
 </script>
 </body>
