@@ -203,6 +203,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 .drop .t1{font-size:15px;font-weight:600}
 .drop .t2{font-size:13px;color:var(--t3);margin-top:4px}
 #prev{width:100%;max-height:280px;object-fit:cover;border-radius:18px;margin-top:14px;display:none}
+.scan-description{min-height:88px;resize:vertical;font-variant-numeric:normal}
 .scan-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 .scan-date{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .scan-result-item .portion-controls{display:flex;align-items:center;gap:6px}
@@ -551,6 +552,11 @@ details summary:hover{color:var(--t1)}
             <input type="file" id="fileIn" accept="image/*" style="display:none">
             <input type="file" id="camIn" accept="image/*" capture="environment" style="display:none">
             <img id="prev" alt="meal">
+            <div class="field" style="margin-top:14px">
+              <label class="lbl" for="photoDescription">Food details (optional)</label>
+              <textarea class="scan-description" id="photoDescription" rows="3" maxlength="500" placeholder="Add portion size, ingredients, or how it was cooked — e.g. 1 bowl rice, chicken cooked with 1 tbsp oil"></textarea>
+              <div class="meta" style="font-size:12px;margin-top:6px;color:var(--t3)">Extra details help improve the nutrition estimate.</div>
+            </div>
             <div class="scan-actions">
               <button class="btn full" id="camBtn">Camera</button>
               <button class="btn pri full" id="scanBtn" disabled>Analyze</button>
@@ -865,7 +871,7 @@ details summary:hover{color:var(--t1)}
           <div class="notice" style="margin-bottom:16px">
             Keep your meals, workouts, water, weight, goals and saved meals in a private Google Drive app-data file.
             Your data stays separate from this website's code and can be restored after an update.
-            On mobile, tap the Settings gear at the top right and scroll to this section. After the one-time setup below, changes sync automatically while Google Drive is connected; returning visits try to reconnect and load your Drive data.
+            On mobile, tap the Settings gear at the top right and scroll to this section. After the one-time setup below, changes sync automatically while Google Drive is connected. Select Connect Google when you want to reconnect Drive in a new page session.
           </div>
           <div class="field">
             <label class="lbl">Google OAuth client ID</label>
@@ -1099,22 +1105,6 @@ function scheduleDriveSave(){
   driveSaveTimer = setTimeout(()=>driveUpload().catch(e=>driveMessage(e.message)), 900);
 }
 
-function trySilentDriveConnect(){
-  if(!S.driveClientId || !window.google?.accounts?.oauth2) return;
-  const client=google.accounts.oauth2.initTokenClient({client_id:S.driveClientId,scope:'https://www.googleapis.com/auth/drive.appdata',prompt:'',callback:async response=>{
-    if(response.error) return;
-    driveAccessToken=response.access_token; updateDriveBadge(true);
-    try{ await driveLoad(); driveMessage('Drive sync is active.'); }
-    catch(e){
-      if(e.message.includes('No Cal data')){
-        try{ await driveUpload(); driveMessage('Drive sync is active. Your local data was backed up.'); }
-        catch(uploadError){ driveMessage(uploadError.message); }
-      } else driveMessage(e.message);
-    }
-  }});
-  client.requestAccessToken({prompt:''});
-}
-
 async function driveLoad(){
   const file = await driveFile();
   if(!file) throw new Error('No Cal data found in Drive yet');
@@ -1330,7 +1320,7 @@ let activeGeminiModel = null;
 const PROMPT = `You are a nutrition estimator. Analyze the food described or shown.
 Return ONLY minified JSON, no markdown, no code fences, matching exactly:
 {"isFood":true,"mealName":"string","confidence":"high|medium|low","items":[{"name":"string","quantity":"string","grams":number,"kcal":number,"protein":number,"carbs":number,"fat":number}],"total":{"kcal":number,"protein":number,"carbs":number,"fat":number},"note":"one short practical note about this meal"}
-Rules: identify each distinct food separately. Estimate a realistic single serving.
+Rules: identify each distinct food separately. Estimate a realistic single serving. If the user provides a description with a photo, use it as additional context for ingredients, preparation and portion size; prioritize explicit quantities in the description when estimating.
 Use precise portion units: drinks and liquids in ml (for example 250 ml), rice, curry, oats and meat in grams (for example 180 g), and countable foods such as idli, eggs, roti, dosa, naan and slices in pieces (for example 3 pieces). Put the same unit in quantity and use grams for the numeric grams field when applicable.
 If the image clearly contains no food, set isFood false and items to [].
 Numbers are integers except protein/carbs/fat which may have one decimal.`;
@@ -1683,7 +1673,10 @@ async function runAnalyze(imageB64, text){
     setTimeout(()=>{ step.textContent=''; }, 1200);
   }
 }
-$('#scanBtn').onclick = () => { if(!pendingImg){ toast('Add a photo first'); return; } runAnalyze(pendingImg, ''); };
+$('#scanBtn').onclick = () => {
+  if(!pendingImg){ toast('Add a photo first'); return; }
+  runAnalyze(pendingImg, $('#photoDescription').value.trim());
+};
 $('#textBtn').onclick = () => {
   const v = $('#textIn').value.trim();
   if(!v){ toast('Describe your meal first'); return; }
@@ -2366,7 +2359,6 @@ $('#bodyW').value=S.weight; $('#setW').value=S.weight; $('#setTW').value=S.targe
 $('#driveClientId').value=S.driveClientId || DEFAULT_DRIVE_CLIENT_ID;
 $('#mealDate').value=TODAY(); $('#mealDate').max=TODAY();
 $('#stepDate').value=TODAY(); $('#stepDate').max=TODAY(); updateStepDateDisplay(); renderStepsCalendar();
-window.addEventListener('load', trySilentDriveConnect);
 </script>
 </body>
 </html>
