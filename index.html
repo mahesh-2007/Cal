@@ -900,7 +900,7 @@ details summary:hover{color:var(--t1)}
           <div class="card-hd"><div class="h4">AI key</div><span class="badge bg-Pull sp" id="keyBadge">not set</span></div>
           <div class="notice" style="margin-bottom:16px">
             Paste a free <b>Google AI Studio</b> key to enable real photo analysis with
-            <b>Gemini 2.5 Flash</b>. Free tier: 250 requests/day, no card.
+            <b>Gemini 3.8 Flash</b>. Free tier: 250 requests/day, no card.
             <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a key →</a><br><br>
             Without a key the app still works — scans fall back to a built-in 90-food estimator.
           </div>
@@ -1128,8 +1128,8 @@ function connectDrive(){
   const client=google.accounts.oauth2.initTokenClient({client_id:S.driveClientId,scope:'https://www.googleapis.com/auth/drive.appdata',callback:async response=>{
     if(response.error){ driveMessage('Google sign-in was cancelled.'); return; }
     driveAccessToken=response.access_token; updateDriveBadge(true); driveMessage('Connected. Loading Drive data…');
-    try{ await driveLoad(); driveMessage('Drive data loaded.'); }
-    catch(e){ if(e.message.includes('No Cal data')){ await driveUpload(); driveMessage('Connected. Your local data is now backed up to Drive.'); } else driveMessage(e.message); }
+    try{ await driveLoad(); driveMessage('Drive data loaded.'); switchView('home'); }
+    catch(e){ if(e.message.includes('No Cal data')){ await driveUpload(); driveMessage('Connected. Your local data is now backed up to Drive.'); switchView('home'); } else driveMessage(e.message); }
   }});
   client.requestAccessToken();
 }
@@ -1306,14 +1306,7 @@ const EMO = n => /chicken|egg|fish|paneer|whey|protein|prawn|tofu|soya|meat/i.te
    GEMINI — real vision + text analysis (free tier)
    ============================================================================ */
 const GEMINI_MODELS = [
-  'gemini-3.8-flash',
-  'gemini-3.7-flash',
-  'gemini-3.6-flash',
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-3.1-flash-lite',
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite'
+  'gemini-3.8-flash'
 ];
 let activeGeminiModel = null;
 
@@ -1726,8 +1719,13 @@ function renderResult(){
     ${result.note?`<div class="notice" style="margin-top:16px">${esc(result.note)}</div>`:''}
     <div class="btn-row" style="margin-top:18px">
       <button class="btn pri pill full" onclick="saveResult()">Add to selected day</button>
+      <button class="btn full" id="saveResultButton" onclick="saveResultToLibrary()">☆ Save meal</button>
       <button class="btn" onclick="discard()">Discard</button>
     </div>`;
+  const saved = S.saved.some(m=>m.name.toLowerCase()===resultMealName().toLowerCase());
+  const saveButton = $('#saveResultButton');
+  saveButton.textContent = saved ? '✓ Saved' : '☆ Save meal';
+  saveButton.disabled = saved;
   c.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 window.removeDetected = i => {
@@ -1752,14 +1750,34 @@ window.bump = (i, d) => {
   $('#resKcal').textContent = num(t.kcal);
 };
 window.discard = () => { $('#resultCard').style.display='none'; result=null; pendingImg=null; $('#prev').style.display='none'; $('#scanBtn').disabled=true; };
+function resultMealName(){
+  return result.items.map(i=>(i.qty&&i.qty!==1)?`${i.qty}× ${i.name}`:i.name).join(', ') || result.mealName;
+}
+function resultMealData(){
+  const t=result.total;
+  return {
+    name:resultMealName(), kcal:Math.round(t.kcal),
+    protein:+t.protein.toFixed(1), carbs:+t.carbs.toFixed(1), fat:+t.fat.toFixed(1),
+    type:$('#mealType').value
+  };
+}
+window.saveResultToLibrary = () => {
+  if(!result) return;
+  const meal=resultMealData();
+  if(S.saved.some(m=>m.name.toLowerCase()===meal.name.toLowerCase())){ toast('That meal is already saved'); return; }
+  S.saved.push(meal);
+  saveState(); renderLibrary();
+  const button=$('#saveResultButton');
+  if(button){ button.textContent='✓ Saved'; button.disabled=true; }
+  toast('Meal saved for quick add','☆');
+};
 window.saveResult = () => {
   if(!result) return;
-  const t = result.total;
+  const savedMeal=resultMealData();
   const meal = {
-    name: result.items.map(i=>(i.qty&&i.qty!==1)?`${i.qty}× ${i.name}`:i.name).join(', ') || result.mealName,
-    kcal:Math.round(t.kcal), protein:+t.protein.toFixed(1), carbs:+t.carbs.toFixed(1), fat:+t.fat.toFixed(1),
+    ...savedMeal,
     img: pendingImg ? 'data:image/jpeg;base64,'+pendingImg : null,
-    src: pendingImg ? 'photo':'text', type:$('#mealType').value,
+    src: pendingImg ? 'photo':'text',
     at: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
   };
   const logKey = $('#mealDate').value || TODAY();
@@ -2359,6 +2377,7 @@ $('#bodyW').value=S.weight; $('#setW').value=S.weight; $('#setTW').value=S.targe
 $('#driveClientId').value=S.driveClientId || DEFAULT_DRIVE_CLIENT_ID;
 $('#mealDate').value=TODAY(); $('#mealDate').max=TODAY();
 $('#stepDate').value=TODAY(); $('#stepDate').max=TODAY(); updateStepDateDisplay(); renderStepsCalendar();
+if(!driveAccessToken) switchView('settings');
 </script>
 </body>
 </html>
