@@ -249,13 +249,18 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 .wd .dn{font-size:16px;font-weight:700;margin:5px 0 7px;letter-spacing:-.2px}
 .wd .dt{font-size:9px;font-weight:700;letter-spacing:.4px;border-radius:6px;padding:3px 0;display:block}
 .wd.today{box-shadow:inset 0 0 0 1.5px var(--t1)}
-.dt.Push{background:rgba(255,110,135,.16);color:var(--f)}
+.dt.Push,.dt.Upper-Body{background:rgba(255,110,135,.16);color:var(--f)}
 .dt.Pull{background:rgba(77,168,255,.16);color:var(--p)}
-.dt.Legs{background:rgba(255,181,76,.16);color:var(--c)}
+.dt.Legs,.dt.Lower-Body{background:rgba(255,181,76,.16);color:var(--c)}
 .dt.Rest{background:rgba(110,110,110,.16);color:var(--t3)}
 .dt.none{background:transparent;color:var(--t3)}
 .wd .min{font-size:9px;color:var(--t3);margin-top:4px;font-weight:600}
 @media(max-width:420px){.wd{padding:9px 2px}.wd .dn{font-size:14px}}
+.weight-bars{display:flex;align-items:flex-end;gap:4px;height:68px}
+.weight-bar{flex:1;min-width:0;min-height:6px;border-radius:4px 4px 0 0;background:var(--surf3)}
+.weight-bar.current{background:var(--t1)}
+.weight-dates{display:flex;gap:4px;margin-top:7px}
+.weight-date{flex:1;min-width:0;text-align:center;font-size:8px;line-height:1.1;color:var(--t3);white-space:nowrap}
 
 /* ---------- timer ---------- */
 .timer{text-align:center;padding:10px 0 6px}
@@ -264,7 +269,8 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 .timer .sub{font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--t3);text-transform:uppercase;margin-top:8px}
 
 /* ---------- split picker ---------- */
-.splits{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.splits{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media(max-width:520px){.splits{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .sp{background:var(--surf2);border:1.5px solid transparent;border-radius:18px;padding:18px 8px;text-align:center;cursor:pointer;transition:.18s}
 .sp:hover{background:var(--surf3)}
 .sp .ic{font-size:22px;display:block;margin-bottom:8px;opacity:.85}
@@ -360,8 +366,10 @@ details summary:hover{color:var(--t1)}
 .lic .v{font-weight:700;font-variant-numeric:tabular-nums}
 .badge{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;border-radius:7px;padding:4px 8px}
 .bg-Push{background:rgba(255,110,135,.16);color:var(--f)}
+.bg-Upper-Body{background:rgba(255,110,135,.16);color:var(--f)}
 .bg-Pull{background:rgba(77,168,255,.16);color:var(--p)}
 .bg-Legs{background:rgba(255,181,76,.16);color:var(--c)}
+.bg-Lower-Body{background:rgba(255,181,76,.16);color:var(--c)}
 .bg-Rest{background:rgba(110,110,110,.16);color:var(--t3)}
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-thumb{background:var(--surf3);border-radius:8px}
@@ -373,6 +381,7 @@ details summary:hover{color:var(--t1)}
   .hero{font-size:56px}
   .hero-row .unit{font-size:13px}
   .row{gap:9px}
+  .split-counts{grid-template-columns:repeat(3,minmax(0,1fr))!important}
   #v-scan .card-hd{flex-wrap:wrap;align-items:flex-start}
   #v-scan .card-hd .h4{min-width:0;flex:1 1 150px;overflow-wrap:anywhere}
   #v-scan .card-hd #modeBtn{margin-left:auto}
@@ -617,6 +626,8 @@ details summary:hover{color:var(--t1)}
             <div class="sp" data-t="Push"><span class="ic">💪</span><div class="nm">Push</div><div class="ds">Chest · Shoulders · Triceps</div></div>
             <div class="sp" data-t="Pull"><span class="ic">🎯</span><div class="nm">Pull</div><div class="ds">Back · Biceps · Rear delts</div></div>
             <div class="sp" data-t="Legs"><span class="ic">🦵</span><div class="nm">Legs</div><div class="ds">Quads · Hams · Glutes · Calves</div></div>
+            <div class="sp" data-t="Upper Body"><span class="ic">🏋️</span><div class="nm">Upper body</div><div class="ds">Chest · Back · Arms</div></div>
+            <div class="sp" data-t="Lower Body"><span class="ic">🦵</span><div class="nm">Lower body</div><div class="ds">Quads · Hams · Glutes</div></div>
           </div>
 
           <div class="exercise-log" id="exerciseLog">
@@ -686,7 +697,7 @@ details summary:hover{color:var(--t1)}
 
         <div class="card sm">
           <div class="card-hd" style="margin-bottom:12px"><div class="h5" style="font-size:14px">Burn estimate</div></div>
-          <p class="body" style="font-size:13px">Estimated from workout type, duration, intensity and your body weight. Today's estimate updates when you change your weight or log a different workout.</p>
+          <p class="body" style="font-size:13px">Gemini estimates burn from your workout time, split, body weight, height, intensity, sets and reps when your AI key is connected. Otherwise, a body-size-adjusted workout-volume estimate is used. The result is included in today's overall calorie balance.</p>
           <div class="f2" style="margin-top:14px">
             <div class="field" style="margin:0">
               <label class="lbl">Weight (kg)</label>
@@ -730,10 +741,12 @@ details summary:hover{color:var(--t1)}
         </div>
         <div class="week" id="weekStrip"></div>
         <div class="divider"></div>
-        <div class="f3">
+        <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px" class="split-counts">
           <div class="tile"><div class="lbl">Push</div><div class="v" id="cP">0</div></div>
           <div class="tile"><div class="lbl">Pull</div><div class="v" id="cU">0</div></div>
           <div class="tile"><div class="lbl">Legs</div><div class="v" id="cL">0</div></div>
+          <div class="tile"><div class="lbl">Upper</div><div class="v" id="cUpper">0</div></div>
+          <div class="tile"><div class="lbl">Lower</div><div class="v" id="cLower">0</div></div>
         </div>
         <div class="f3" style="margin-top:12px">
           <div class="tile"><div class="lbl">Rest</div><div class="v" id="cR">7</div></div>
@@ -1499,7 +1512,7 @@ function renderHome(){
       <button class="btn pri full" style="margin-top:16px" onclick="go('train')">Log a workout</button>`;
   } else {
     const w = d.workout;
-    box.innerHTML = `<div class="card-hd"><div class="h5">Today's session</div><span class="badge bg-${w.type} sp">${w.type}</span></div>
+    box.innerHTML = `    <div class="card-hd"><div class="h5">Today's session</div><span class="badge bg-${workoutClass(w.type)} sp">${esc(w.type)}</span></div>
       <div class="lic"><span class="k">Duration</span><span class="v">${w.min} min</span></div>
       <div class="lic"><span class="k">Est. burn</span><span class="v">${num(w.burn)} kcal</span></div>
       <div class="lic"><span class="k">Intensity</span><span class="v">${w.intensity}×</span></div>
@@ -1559,7 +1572,7 @@ function renderHome(){
         : 'Add a colourful fruit or vegetable alongside the next meal for fibre and micronutrient variety.';
     note += ` Logged today: ${text}. ${foodFocus}`;
   }
-  if(d.workout) note += ` ${d.workout.type} session logged (${d.workout.min} min). Next rotation: ${d.workout.type==='Push'?'Pull':d.workout.type==='Pull'?'Legs':'Push'}.`;
+  if(d.workout) note += ` ${d.workout.type} session logged (${d.workout.min} min). Next rotation: ${nextWorkoutType(d.workout.type)}.`;
   $('#quickNote').textContent = note;
 
   renderApiStatus();
@@ -1805,6 +1818,18 @@ function renderRecent(){
    ============================================================================ */
 let pick = null;
 let exerciseDraft = [];
+const WORKOUT_TYPES = ['Push','Pull','Legs','Upper Body','Lower Body'];
+const WORKOUT_CLASS = {'Push':'Push','Pull':'Pull','Legs':'Legs','Upper Body':'Upper-Body','Lower Body':'Lower-Body'};
+const WORKOUT_ICON = {'Push':'💪','Pull':'🎯','Legs':'🦵','Upper Body':'🏋️','Lower Body':'🦵'};
+const workoutClass = type => WORKOUT_TYPES.includes(type) ? WORKOUT_CLASS[type] : 'Rest';
+const workoutIcon = type => WORKOUT_TYPES.includes(type) ? WORKOUT_ICON[type] : '🏋️';
+function nextWorkoutType(type){
+  const index=WORKOUT_TYPES.indexOf(type);
+  return WORKOUT_TYPES[(index+1)%WORKOUT_TYPES.length];
+}
+function normalizeExerciseName(name){
+  return String(name||'').trim().replace(/\s+/g,' ').toLowerCase();
+}
 function renderRoutineList(){
   const list=$('#routineList');
   if(!list) return;
@@ -1859,7 +1884,7 @@ $('#saveRoutine').onclick=()=>{
 $('#strengthExercise').onchange=renderStrength;
 const fmtT = s => [Math.floor(s/3600), Math.floor(s%3600/60), s%60].map(v=>String(v).padStart(2,'0')).join(':');
 $('#startBtn').onclick = () => {
-  if(!pick){ toast('Pick Push, Pull or Legs first','⚠️'); return; }
+  if(!pick){ toast('Pick a workout split first','⚠️'); return; }
   if(S.timer.on) return;
   S.timer.on = true; S.timer.type = pick;
   $('#timerBox').classList.add('on');
@@ -1879,25 +1904,62 @@ $('#resetBtn').onclick = () => {
   $('#startBtn').disabled = false; $('#pauseBtn').disabled = true;
   $('#startBtn').textContent = 'Start';
 };
-const MET = t => t==='Legs' ? 7.0 : 6.0;
-function estimateWorkoutBurn(workout, weightKg=S.weight){
+const MET = t => ['Legs','Lower Body'].includes(t) ? 7.0 : 6.0;
+function bodySizeFactor(weightKg,heightCm){
+  const weight=Number(weightKg)||70, height=Number(heightCm)||170;
+  const surfaceArea=Math.sqrt(weight*height/3600);
+  return Math.max(.9,Math.min(1.1,surfaceArea/1.8));
+}
+function estimateWorkoutBurn(workout, weightKg=S.weight, heightCm=S.heightCm){
   if(!workout) return 0;
-  return Math.round(weightKg*(Number(workout.min)||0)/60*MET(workout.type)*(Number(workout.intensity)||1));
+  const duration=Number(workout.min)||0, mass=Number(weightKg)||70;
+  const sizeFactor=bodySizeFactor(mass,heightCm);
+  const base=mass*duration/60*MET(workout.type)*(Number(workout.intensity)||1)*sizeFactor;
+  const reps=(workout.exercises||[]).reduce((total,x)=>total+(Number(x.sets)||0)*(Number(x.reps)||0),0);
+  const repsPerMinute=reps/Math.max(duration,1);
+  const volumeFactor=Math.max(.8,Math.min(1.2,1+(repsPerMinute-2)*.04));
+  const activityEstimate=Math.round(base*volumeFactor);
+  const aiBurn=Number(workout.aiBurn), aiWeight=Number(workout.aiWeightKg), aiHeight=Number(workout.aiHeightCm);
+  if(Number.isFinite(aiBurn) && aiBurn>0 && Number.isFinite(aiWeight) && aiWeight>0){
+    return Math.round(aiBurn*(mass/aiWeight)*(aiHeight>0?sizeFactor/bodySizeFactor(aiWeight,aiHeight):1));
+  }
+  return activityEstimate;
 }
 function estimateStepBurn(steps, weightKg=S.weight, heightCm=S.heightCm){
   const strideMeters = (Number(heightCm)||170)*0.00415;
   const distanceKm = Math.max(0,Number(steps)||0)*strideMeters/1000;
   return Math.round((Number(weightKg)||70)*distanceKm*0.5);
 }
-$('#saveWo').onclick = () => {
-  if(!pick){ toast('Choose a split','⚠️'); return; }
+$('#saveWo').onclick = async () => {
+  if(!pick){ toast('Choose a workout split','⚠️'); return; }
   const manual = parseFloat($('#manMin').value);
   const mins = manual>0 ? manual : Math.round(S.timer.sec/60);
   if(!mins || mins<1){ toast('Start the timer or enter minutes','⚠️'); return; }
   const inten = parseFloat($('#intensity').value);
   const workout = {type:pick, min:Math.round(mins), intensity:inten, weightKg:S.weight, notes:$('#notes').value.trim(), exercises:[...exerciseDraft],
                    at:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})};
-  const burn = estimateWorkoutBurn(workout);
+  let burn = estimateWorkoutBurn(workout), estimateError = '';
+  const saveButton=$('#saveWo');
+  saveButton.disabled=true;
+  if(S.apiKey){
+    try{
+      const result=await geminiCall([{text:`Estimate active calories burned for this resistance-training session. Use workout duration (including rests), body weight, height, intensity, muscle split, and total sets and repetitions; use the listed loads as context. Do not count resting daily calories. Return only JSON in this exact shape: {"calories": number}. Make a conservative, realistic estimate.\nSession: ${JSON.stringify({
+        split:workout.type, durationMinutes:workout.min, bodyWeightKg:S.weight, heightCm:S.heightCm, intensity:workout.intensity,
+        exercises:workout.exercises.map(({name,sets,reps,weight})=>({name,sets,reps,weightKg:weight}))
+      })}`}],S.apiKey);
+      const aiBurn=Number(result.calories);
+      if(!Number.isFinite(aiBurn) || aiBurn<=0 || aiBurn>workout.min*20 || aiBurn<burn*.5 || aiBurn>burn*2){
+        throw new Error('AI returned an implausible calorie estimate');
+      }
+      workout.aiBurn=Math.round(aiBurn);
+      workout.aiWeightKg=S.weight;
+      workout.aiHeightCm=S.heightCm;
+      workout.estimateSource='Gemini AI';
+      burn=estimateWorkoutBurn(workout);
+    }catch(error){
+      estimateError=error instanceof Error ? error.message : String(error);
+    }
+  }
   workout.burn = burn;
   today().workout = workout;
   clearInterval(S.timer.id); S.timer={on:false,sec:0,id:null,type:pick};
@@ -1905,7 +1967,10 @@ $('#saveWo').onclick = () => {
   $('#manMin').value=''; $('#notes').value='';
   exerciseDraft=[]; renderExerciseDraft();
   $('#startBtn').disabled=false; $('#pauseBtn').disabled=true; $('#startBtn').textContent='Start';
-  renderAll(); toast(`${pick} saved · ~${num(burn)} kcal`,'✓');
+  saveButton.disabled=false;
+  renderAll();
+  if(estimateError) toast(`${pick} saved · ~${num(burn)} kcal formula estimate; AI estimate failed: ${esc(estimateError)}`,'⚠️');
+  else toast(`${pick} saved · ~${num(burn)} kcal ${workout.estimateSource?'Gemini AI':'formula'} estimate`,'✓');
 };
 function weekKeys(off){
   const b = new Date(); b.setDate(b.getDate()+off*7);
@@ -1918,17 +1983,17 @@ function renderTrain(){
   const n = wk.filter(k=>S.days[k]&&S.days[k].workout).length;
   $('#wSess').textContent = d.workout ? d.workout.type : '—';
   $('#wDur').textContent  = (d.workout?d.workout.min:0)+' min';
-  $('#wBurn').textContent = num(estimateWorkoutBurn(d.workout))+' kcal';
+  $('#wBurn').textContent = num(estimateWorkoutBurn(d.workout,S.weight,S.heightCm))+' kcal';
   $('#wWeek').textContent = n+' / '+S.weekGoal;
 
   const rows = Object.keys(S.days).filter(k=>S.days[k].workout).sort().reverse().slice(0,12);
   $('#woHist').innerHTML = rows.length ? rows.map(k=>{
     const w = S.days[k].workout;
     return `<div class="row">
-      <div class="aw">${w.type==='Push'?'💪':w.type==='Pull'?'🎯':'🦵'}</div>
-      <div class="main"><div class="nm" style="font-size:15px">${w.type} day</div>
-        <div class="ms">${nice(k)} · ${w.min} min · ~${num(w.burn)} kcal</div></div>
-      <span class="badge bg-${w.type}">${w.type}</span>
+      <div class="aw">${workoutIcon(w.type)}</div>
+      <div class="main"><div class="nm" style="font-size:15px">${esc(w.type)} day</div>
+        <div class="ms">${nice(k)} · ${w.min} min · ~${num(estimateWorkoutBurn(w,S.weight,S.heightCm))} kcal</div></div>
+      <span class="badge bg-${workoutClass(w.type)}">${esc(w.type)}</span>
     </div>`;
   }).join('') : `<div class="empty"><span class="ic">📜</span><div class="tx">No sessions yet</div></div>`;
   renderStrength();
@@ -1945,16 +2010,28 @@ function renderStrength(){
     chart.innerHTML='';
     return;
   }
-  const names=[...new Set(sessions.map(x=>x.name))].sort();
+  const exerciseNames=new Map();
+  sessions.forEach(x=>{
+    const key=normalizeExerciseName(x.name);
+    if(key && !exerciseNames.has(key)) exerciseNames.set(key,String(x.name).trim().replace(/\s+/g,' '));
+  });
+  const names=[...exerciseNames.keys()].sort((a,b)=>exerciseNames.get(a).localeCompare(exerciseNames.get(b)));
   const select=$('#strengthExercise'), previous=select.value;
-  select.innerHTML=names.map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('');
+  select.innerHTML=names.map(key=>`<option value="${esc(key)}">${esc(exerciseNames.get(key))}</option>`).join('');
   select.value=names.includes(previous)?previous:names[0];
-  const selected=sessions.filter(x=>x.name===select.value), sets=selected.reduce((a,x)=>a+x.sets,0), reps=selected.reduce((a,x)=>a+x.sets*x.reps,0);
+  const selected=sessions.filter(x=>normalizeExerciseName(x.name)===select.value), sets=selected.reduce((a,x)=>a+x.sets,0), reps=selected.reduce((a,x)=>a+x.sets*x.reps,0);
   const volume=selected.reduce((a,x)=>a+x.sets*x.reps*x.weight,0);
   const best=selected.reduce((a,x)=>Math.max(a,x.weight*(1+x.reps/30)),0);
-  summary.innerHTML=`<div class="f3" style="gap:7px"><div class="tile"><div class="lbl">Sets</div><div class="v" style="font-size:20px">${sets}</div></div><div class="tile"><div class="lbl">Reps</div><div class="v" style="font-size:20px">${reps}</div></div><div class="tile"><div class="lbl">Best est. 1RM</div><div class="v" style="font-size:20px">${best.toFixed(1)}<small>kg</small></div></div></div><div class="meta" style="margin-top:12px">${esc(select.value)} · ${Math.round(volume).toLocaleString('en-US')} kg total volume · estimated 1RM trend</div>`;
-  const points=selected.slice(-8), max=Math.max(...points.map(x=>x.weight*(1+x.reps/30)),1);
-  chart.innerHTML=points.map(x=>{const e=x.weight*(1+x.reps/30); return `<div class="strength-bar" style="height:${Math.max(8,e/max*100)}%"><span class="value">${e.toFixed(0)} kg</span><span class="label">${nice(x.k)}</span></div>`;}).join('');
+  const displayName=exerciseNames.get(select.value);
+  summary.innerHTML=`<div class="f3" style="gap:7px"><div class="tile"><div class="lbl">Sets</div><div class="v" style="font-size:20px">${sets}</div></div><div class="tile"><div class="lbl">Reps</div><div class="v" style="font-size:20px">${reps}</div></div><div class="tile"><div class="lbl">Best est. 1RM</div><div class="v" style="font-size:20px">${best.toFixed(1)}<small>kg</small></div></div></div><div class="meta" style="margin-top:12px">${esc(displayName)} · ${Math.round(volume).toLocaleString('en-US')} kg total volume · estimated 1RM trend</div>`;
+  const byDay=new Map();
+  selected.forEach(x=>{
+    const value=x.weight*(1+x.reps/30);
+    byDay.set(x.k,Math.max(byDay.get(x.k)||0,value));
+  });
+  const points=[...byDay].sort(([a],[b])=>a.localeCompare(b)).slice(-8);
+  const max=Math.max(...points.map(([,value])=>value),1);
+  chart.innerHTML=points.map(([day,value])=>`<div class="strength-bar" style="height:${Math.max(8,value/max*100)}%"><span class="value">${value.toFixed(0)} kg</span><span class="label">${nice(day)}</span></div>`).join('');
 }
 function nice(k){
   const t=new Date(), y=new Date(); y.setDate(y.getDate()-1);
@@ -1966,7 +2043,7 @@ function suggestNext(){
   const past = Object.keys(S.days).filter(k=>S.days[k].workout && k<=TODAY()).sort().pop();
   if(!past) return 'Push';
   const t = S.days[past].workout.type;
-  return t==='Push'?'Pull':t==='Pull'?'Legs':'Push';
+  return nextWorkoutType(t);
 }
 
 /* ============================================================================
@@ -2037,31 +2114,33 @@ function renderWeek(){
     return `<div class="wd ${k===tk?'today':''}">
       <div class="dw">${names[i]}</div>
       <div class="dn">${new Date(k+'T12:00:00').getDate()}</div>
-      <span class="dt ${t}">${t==='Rest'?'—':t.toUpperCase()}</span>
+      <span class="dt ${t==='Rest'?'Rest':workoutClass(t)}">${t==='Rest'?'—':t==='Upper Body'?'UPPER':t==='Lower Body'?'LOWER':esc(t.toUpperCase())}</span>
       ${d&&d.workout?`<div class="min">${d.workout.min}m</div>`:''}
     </div>`;
   }).join('');
 
-  let cP=0,cU=0,cL=0,min=0,kcal=0,logged=0;
+  const splitCounts=Object.fromEntries(WORKOUT_TYPES.map(type=>[type,0]));
+  let min=0,kcal=0,logged=0;
   keys.forEach(k=>{
     const d = S.days[k]; if(!d) return;
-    if(d.workout){ const t=d.workout.type; t==='Push'?cP++:t==='Pull'?cU++:cL++; min+=d.workout.min; }
+    if(d.workout){ if(WORKOUT_TYPES.includes(d.workout.type)) splitCounts[d.workout.type]++; min+=d.workout.min; }
     if(d.meals.length){ kcal += eaten(k).kcal; logged++; }
   });
-  $('#cP').textContent=cP; $('#cU').textContent=cU; $('#cL').textContent=cL;
-  $('#cR').textContent = 7-cP-cU-cL; $('#cM').textContent = num(min);
+  $('#cP').textContent=splitCounts.Push; $('#cU').textContent=splitCounts.Pull; $('#cL').textContent=splitCounts.Legs;
+  $('#cUpper').textContent=splitCounts['Upper Body']; $('#cLower').textContent=splitCounts['Lower Body'];
+  $('#cR').textContent = 7-WORKOUT_TYPES.reduce((total,type)=>total+splitCounts[type],0); $('#cM').textContent = num(min);
   $('#cK').textContent = logged ? num(kcal/logged) : 0;
 
   const rows = keys.filter(k=>S.days[k]&&(S.days[k].workout||S.days[k].meals.length||S.days[k].steps)).reverse();
   $('#weekLog').innerHTML = rows.length ? rows.map(k=>{
     const d=S.days[k], w=d.workout, t=eaten(k);
     return `<div class="row">
-      <div class="aw">${w?(w.type==='Push'?'💪':w.type==='Pull'?'🎯':'🦵'):'🍽'}</div>
+      <div class="aw">${w?workoutIcon(w.type):'🍽'}</div>
       <div class="main">
-        <div class="nm" style="font-size:15px">${w?w.type+' day':d.meals.length?'Nutrition only':'Steps'} <span class="meta" style="font-weight:500">· ${nice(k)}</span></div>
-        <div class="ms">${w?`${w.min} min · ~${num(w.burn)} workout kcal · `:''}${d.steps?`${num(d.steps)} steps · ~${num(estimateStepBurn(d.steps,S.weight,S.heightCm))} kcal walking · `:''}${num(t.kcal)} kcal eaten</div>
+        <div class="nm" style="font-size:15px">${w?esc(w.type)+' day':d.meals.length?'Nutrition only':'Steps'} <span class="meta" style="font-weight:500">· ${nice(k)}</span></div>
+        <div class="ms">${w?`${w.min} min · ~${num(estimateWorkoutBurn(w))} workout kcal · `:''}${d.steps?`${num(d.steps)} steps · ~${num(estimateStepBurn(d.steps,S.weight,S.heightCm))} kcal walking · `:''}${num(t.kcal)} kcal eaten</div>
       </div>
-      ${w?`<span class="badge bg-${w.type}">${w.min}m</span>`:''}
+      ${w?`<span class="badge bg-${workoutClass(w.type)}">${w.min}m</span>`:''}
     </div>`;
   }).join('') : `<div class="empty"><span class="ic">📅</span><div class="tx">Nothing logged this week</div></div>`;
   renderStepsCalendar();
@@ -2084,7 +2163,7 @@ function renderCoach(){
     : 'No meals logged yet, so nutrition variety is still unknown.';
 
   let trainLine = d.workout
-    ? `You logged <b>${d.workout.type}</b> for ${d.workout.min} minutes, roughly <b>${num(workoutBurn)} kcal</b> burned. Next in the rotation is <b>${d.workout.type==='Push'?'Pull':d.workout.type==='Pull'?'Legs':'Push'}</b>.`
+    ? `You logged <b>${d.workout.type}</b> for ${d.workout.min} minutes, roughly <b>${num(workoutBurn)} kcal</b> burned. Next in the rotation is <b>${nextWorkoutType(d.workout.type)}</b>.`
     : `No session logged yet today. Based on your history, <b>${suggestNext()}</b> is next in the rotation.`;
 
   $('#briefing').innerHTML = `
@@ -2150,11 +2229,11 @@ function renderCoach(){
   renderWeight();
 }
 function splitBalance(){
-  const wk = weekKeys(0); let c={Push:0,Pull:0,Legs:0};
-  wk.forEach(k=>{ const w=S.days[k]&&S.days[k].workout; if(w) c[w.type]++; });
-  const vals=[c.Push,c.Pull,c.Legs], max=Math.max(...vals), min=Math.min(...vals);
+  const wk = weekKeys(0), c=Object.fromEntries(WORKOUT_TYPES.map(type=>[type,0]));
+  wk.forEach(k=>{ const w=S.days[k]&&S.days[k].workout; if(w && WORKOUT_TYPES.includes(w.type)) c[w.type]++; });
+  const vals=Object.values(c), max=Math.max(...vals), min=Math.min(...vals);
   if(max===0) return 'no data';
-  return (max-min<=1) ? 'balanced' : `skewed (${c.Push}P/${c.Pull}U/${c.Legs}L)`;
+  return (max-min<=1) ? 'balanced' : `skewed (${c.Push}P/${c.Pull}U/${c.Legs}L/${c['Upper Body']}UB/${c['Lower Body']}LB)`;
 }
 function renderWeight(){
   const currentWeek = weekKeys(0);
@@ -2167,7 +2246,9 @@ function renderWeight(){
       : '<b>Next check-in: Sunday.</b> Log once each Sunday to keep your trend accurate.';
     due.style.color = loggedThisWeek ? 'var(--ok)' : 'var(--warn)';
   }
-  const w = S.weights.slice(-14);
+  const byDate=new Map();
+  S.weights.forEach(entry=>{ if(entry && entry.k && Number.isFinite(Number(entry.w))) byDate.set(entry.k,{...entry,w:Number(entry.w)}); });
+  const w=[...byDate.values()].sort((a,b)=>a.k.localeCompare(b.k)).slice(-14);
   if(!w.length){ $('#wtChart').innerHTML = `<p class="meta" style="font-size:12px">Log your weight to see a trend and a projected goal date.</p>`; return; }
   const vals = w.map(x=>x.w), min = Math.min(...vals)-0.5, max = Math.max(...vals)+0.5;
   const first = vals[0], last = vals[vals.length-1], diff = last-first;
@@ -2176,14 +2257,21 @@ function renderWeight(){
   let proj = '—';
   if(rate!==0 && Math.sign(rate)===Math.sign(toGo) && Math.abs(rate)>0.02) proj = Math.ceil(Math.abs(toGo/rate))+' weeks';
   const chartW = 280, chartH = 82;
-  const points = w.map((x,i)=>`${(i/Math.max(w.length-1,1))*chartW},${chartH-((x.w-min)/Math.max(max-min,.1))*chartH}`).join(' ');
+  const xFor=i=>(i/Math.max(w.length-1,1))*chartW;
+  const yFor=x=>chartH-((x.w-min)/Math.max(max-min,.1))*chartH;
+  const points = w.map((x,i)=>`${xFor(i)},${yFor(x)}`).join(' ');
+  const dateLabel=k=>new Date(k+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const fullDate=k=>new Date(k+'T12:00:00').toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
   $('#wtChart').innerHTML = `
     <svg viewBox="0 0 ${chartW} ${chartH}" role="img" aria-label="Weight trend graph" style="width:100%;height:92px;display:block;overflow:visible">
       <polyline points="${points}" fill="none" stroke="var(--p)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      ${w.map((x,i)=>`<circle cx="${(i/Math.max(w.length-1,1))*chartW}" cy="${chartH-((x.w-min)/Math.max(max-min,.1))*chartH}" r="3.5" fill="var(--t1)"/>`).join('')}
+      ${w.map((x,i)=>`<circle cx="${xFor(i)}" cy="${yFor(x)}" r="3.5" fill="var(--t1)"><title>${fullDate(x.k)}: ${x.w.toFixed(1)} kg</title></circle>`).join('')}
     </svg>
-    <div style="display:flex;align-items:flex-end;gap:4px;height:60px">
-      ${w.map(x=>`<div style="flex:1;height:${Math.max(8,(x.w-min)/(max-min)*100)}%;background:${x.w===last?'var(--t1)':'var(--surf3)'};border-radius:4px;min-height:6px" title="${x.w}kg"></div>`).join('')}
+    <div class="weight-bars" role="list" aria-label="Logged weights by date">
+      ${w.map((x,i)=>`<div role="listitem" class="weight-bar${i===w.length-1?' current':''}" style="height:${Math.max(8,(x.w-min)/(max-min)*100)}%" title="${fullDate(x.k)}: ${x.w.toFixed(1)} kg" aria-label="${fullDate(x.k)}: ${x.w.toFixed(1)} kg"></div>`).join('')}
+    </div>
+    <div class="weight-dates" aria-hidden="true">
+      ${w.map(x=>`<span class="weight-date" title="${fullDate(x.k)}">${dateLabel(x.k)}</span>`).join('')}
     </div>
     <div class="lic" style="margin-top:12px"><span class="k">Current</span><span class="v">${last.toFixed(1)} kg</span></div>
     <div class="lic"><span class="k">Change</span><span class="v">${diff>=0?'+':''}${diff.toFixed(1)} kg</span></div>
@@ -2193,7 +2281,9 @@ function renderWeight(){
 window.addWeight = () => {
   const v = parseFloat($('#wtIn').value);
   if(!v || v<25 || v>300){ toast('Enter a valid weight'); return; }
-  S.weights.push({k:TODAY(), w:v});
+  const todayEntries=S.weights.filter(entry=>entry.k===TODAY());
+  if(todayEntries.length) S.weights.forEach(entry=>{ if(entry.k===TODAY()) entry.w=v; });
+  else S.weights.push({k:TODAY(), w:v});
   if(S.weights.length>60) S.weights.shift();
   S.weight = v; $('#wtIn').value=''; $('#setW').value = v; $('#bodyW').value = v;
   renderAll(); toast('Weight logged','⚖');
@@ -2287,10 +2377,11 @@ function answer(q){
   if(/train|workout|gym|lift/.test(s))
     return d.workout ? `You already trained <b>${d.workout.type}</b> for ${d.workout.min} min (~${num(workoutBurn)} kcal). ${d.workout.min<30?'That is on the short side — 40–60 min covers more volume.':'Good duration range.'}`
       : `Nothing logged today. <b>${suggestNext()}</b> is next in your rotation — 45–60 min is the sweet spot.`;
-  if(/week|split|push|pull|legs|balance/.test(s)){
-    const wk=weekKeys(0); let c={Push:0,Pull:0,Legs:0};
-    wk.forEach(x=>{ const w=S.days[x]&&S.days[x].workout; if(w) c[w.type]++; });
-    return `This week: <b>Push ${c.Push}</b>, <b>Pull ${c.Pull}</b>, <b>Legs ${c.Legs}</b> — balance reads <b>${splitBalance()}</b>. ${c.Push+c.Pull+c.Legs} of ${S.weekGoal} sessions done.`;
+  if(/week|split|push|pull|legs|upper|lower|balance/.test(s)){
+    const wk=weekKeys(0), c=Object.fromEntries(WORKOUT_TYPES.map(type=>[type,0]));
+    wk.forEach(x=>{ const w=S.days[x]&&S.days[x].workout; if(w && WORKOUT_TYPES.includes(w.type)) c[w.type]++; });
+    const total=Object.values(c).reduce((sum,count)=>sum+count,0);
+    return `This week: <b>Push ${c.Push}</b>, <b>Pull ${c.Pull}</b>, <b>Legs ${c.Legs}</b>, <b>Upper body ${c['Upper Body']}</b>, <b>Lower body ${c['Lower Body']}</b> — balance reads <b>${splitBalance()}</b>. ${total} of ${S.weekGoal} sessions done.`;
   }
   if(/meal|food|eat|hungry|snack|idea|recipe/.test(s))
     return remain>300 ? `With <b>${num(remain)} kcal</b> left: grilled chicken with rice and veg (~520 kcal, 40g protein), or 2 rotis with dal and curd (~450 kcal, 18g protein).`
