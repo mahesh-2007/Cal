@@ -155,8 +155,6 @@ header{padding:26px 0 20px;display:flex;align-items:center;gap:14px}
 .meal-group{min-width:0;max-width:100%;overflow:hidden;background:var(--surf2);border-radius:14px;padding:0 14px}
 .meal-group summary{display:flex;align-items:center;gap:12px;min-width:0;padding:14px 0;color:var(--t1);list-style:none}
 .meal-group summary::-webkit-details-marker{display:none}
-.meal-group summary::after{content:'⌄';color:var(--t3);font-size:16px;transition:transform .16s}
-.meal-group[open] summary::after{transform:rotate(180deg)}
 .meal-group .meal-heading{flex:1;min-width:0}
 .meal-group .meal-title{font-size:15px;font-weight:600}
 .meal-group .meal-count{font-size:11px;color:var(--t3);margin-left:6px}
@@ -322,9 +320,12 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 .weight-graph svg{width:100%;height:104px;display:block}
 .weight-graph .weight-dates{margin-top:0}
 .weight-graph .weight-date{font-size:9px}
-.gemini-credit{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;color:var(--t2)}
+.gemini-credit{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;font-size:13px;font-weight:600;color:var(--t2)}
+.card-hd .gemini-credit{width:auto}
 .gemini-dot{width:9px;height:9px;border-radius:50%;background:var(--t3);flex:0 0 auto}
 .gemini-dot.connected{background:var(--ok);box-shadow:0 0 8px rgba(66,225,125,.45)}
+input[type="date"],input[type="time"]{color-scheme:dark}
+input[type="date"]::-webkit-calendar-picker-indicator,input[type="time"]::-webkit-calendar-picker-indicator{opacity:.75;cursor:pointer;margin:0 1px 0 8px}
 .steps-sync{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--t3)}
 .steps-sync-dot{display:block;width:8px;height:8px;border-radius:50%;background:var(--t3);flex:0 0 auto}
 .steps-sync-dot.connected{background:var(--ok);box-shadow:0 0 8px rgba(66,225,125,.45)}
@@ -406,9 +407,11 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 .strength-empty{padding:20px 0;color:var(--t3);font-size:13px;text-align:center}
 
 /* ---------- water ---------- */
-.glasses{display:flex;gap:6px}
-.gl{flex:1;height:44px;border-radius:10px;background:var(--surf2);cursor:pointer;transition:.18s;display:grid;place-items:center;font-size:12px;color:var(--t3)}
+.glasses{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}
+.gl{min-width:0;height:44px;border:0;border-radius:10px;background:var(--surf2);cursor:pointer;transition:.18s;display:grid;place-items:center;font-family:inherit;font-size:12px;color:var(--t3)}
 .gl.on{background:rgba(77,168,255,.22);color:var(--p)}
+.water-edit{width:30px;height:30px;margin-left:auto;border:1px solid var(--divider);border-radius:9px;background:var(--surf2);color:var(--t2);font:600 16px/1 inherit;cursor:pointer}
+.water-edit:hover,.water-edit:focus-visible{background:var(--surf3);color:var(--t1);outline:none}
 
 /* ---------- bottom tab bar ---------- */
 .tabbar{
@@ -437,6 +440,15 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 }
 #toast.on{transform:translate(-50%,0);opacity:1;pointer-events:auto}
 @media(min-width:760px){#toast{bottom:28px}}
+
+.update-backdrop{position:fixed;inset:0;z-index:110;background:rgba(0,0,0,.78);display:grid;place-items:center;padding:20px}
+.update-dialog{width:min(100%,460px);max-height:min(80vh,640px);overflow:auto;background:var(--surf1);border:1px solid var(--divider);border-radius:20px;padding:22px}
+.update-dialog h2{font-size:20px;margin-bottom:6px}
+.update-version{font-size:12px;color:var(--t3);margin-bottom:16px}
+.update-notes{max-height:36vh;overflow:auto;background:var(--surf2);border-radius:12px;padding:14px;color:var(--t2);font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.update-actions{display:flex;gap:10px;margin-top:18px}
+.update-actions .btn{flex:1}
+.key-reminder-actions{display:grid;gap:9px;margin-top:18px}
 
 /* ---------- misc ---------- */
 .empty{padding:32px 16px;text-align:center}
@@ -646,7 +658,8 @@ details summary:hover{color:var(--t1)}
         <div class="card sm">
           <div class="card-hd" style="margin-bottom:12px">
             <div class="h5" style="font-size:14px">💧 Water</div>
-            <span class="meta sp" id="waterTxt" style="font-size:12px">0 / 8</span>
+            <span class="meta" id="waterTxt" style="font-size:12px">0 / 2.00 L</span>
+            <button class="water-edit" id="editWaterGoal" type="button" aria-label="Edit daily water target" title="Edit water target">✎</button>
           </div>
           <div class="glasses" id="glasses"></div>
         </div>
@@ -1056,8 +1069,17 @@ details summary:hover{color:var(--t1)}
           <div class="notice" style="margin-bottom:16px">
             Paste a free <b>Google AI Studio</b> key to enable real photo analysis with
             <b>Gemini 3.5 Flash-Lite and 3.8 Flash</b>. Free tier: 250 requests/day, no card.
-            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a key →</a><br><br>
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Open Google AI Studio →</a><br><br>
             Without a key the app still works — scans fall back to a built-in 90-food estimator.
+          </div>
+          <div id="keyGuide" class="notice" style="margin-bottom:16px">
+            <b>How to connect Gemini</b>
+            <ol style="padding-left:20px;margin-top:8px">
+              <li>Open Google AI Studio and sign in to your Google account.</li>
+              <li>Choose <b>Create API key</b> and copy the key.</li>
+              <li>Paste it below, tap <b>Save key</b>, then tap <b>Test</b>.</li>
+            </ol>
+            Your key stays on this device. Gemini features need internet; tracking and offline estimates still work without a key.
           </div>
           <div class="field">
             <label class="lbl">Gemini API key</label>
@@ -1087,6 +1109,7 @@ details summary:hover{color:var(--t1)}
           </div>
           <button class="btn pri full" id="saveGoals">Save goals</button>
         </div>
+
       </div>
 
       <div class="stack">
@@ -1133,7 +1156,7 @@ details summary:hover{color:var(--t1)}
         </div>
 
         <div class="card sm">
-          <div class="card-hd" style="margin-bottom:12px"><div class="h5" style="font-size:14px">About MyCal AI</div><span class="badge bg-Pull sp">Stable v1.0.0</span></div>
+          <div class="card-hd" style="margin-bottom:12px"><div class="h5" style="font-size:14px">About MyCal AI</div><span class="badge bg-Pull sp">Stable v1.0.1</span></div>
           <p class="body" style="font-size:13px">A personal food, movement and weight tracker designed to make everyday health habits easier. Nutrition and activity numbers are estimates, not medical advice.</p>
           <p class="body" style="font-size:13px;margin-top:12px"><b>Conceived by <a class="settings-link" href="https://dev-mahesh-portfolio.web.app/" target="_blank" rel="noopener">Mahesh</a>. Built with AI as a creative co-pilot.</b></p>
           <p class="meta" style="font-size:12px;margin-top:10px"><a class="privacy-link" href="privacypolicy.html" target="_blank" rel="noopener">Privacy policy</a></p>
@@ -1159,6 +1182,44 @@ details summary:hover{color:var(--t1)}
 
 <div id="toast"></div>
 
+<div id="updateBackdrop" class="update-backdrop" style="display:none" role="presentation">
+  <section class="update-dialog" role="dialog" aria-modal="true" aria-labelledby="updateTitle" aria-describedby="updateNotes">
+    <h2 id="updateTitle">Update available</h2>
+    <div class="update-version" id="updateVersion"></div>
+    <div class="update-notes" id="updateNotes"></div>
+    <div class="update-actions">
+      <button class="btn pri" id="updateNow">Update now</button>
+      <button class="btn" id="updateLater">Do it later</button>
+    </div>
+  </section>
+</div>
+
+<div id="keyReminderBackdrop" class="update-backdrop" style="display:none" role="presentation">
+  <section class="update-dialog" role="dialog" aria-modal="true" aria-labelledby="keyReminderTitle" aria-describedby="keyReminderMessage">
+    <h2 id="keyReminderTitle">Set up Gemini AI?</h2>
+    <p class="body" id="keyReminderMessage" style="font-size:14px;margin-top:10px">Add a Google AI Studio key to enable Gemini meal analysis and coaching. This is optional; Cal still works with offline estimates.</p>
+    <div class="key-reminder-actions">
+      <button class="btn pri" id="openKeySettings">Set up / update key</button>
+      <button class="btn" id="continueWithoutKey">Continue without AI</button>
+    </div>
+  </section>
+</div>
+
+<div id="waterGoalBackdrop" class="update-backdrop" style="display:none" role="presentation">
+  <section class="update-dialog" role="dialog" aria-modal="true" aria-labelledby="waterGoalTitle">
+    <h2 id="waterGoalTitle">Daily water target</h2>
+    <p class="body" style="font-size:13px;margin:8px 0 16px">Each glass tracks 250 ml. Choose a target from 0.25 to 10 litres.</p>
+    <div class="field">
+      <label class="lbl" for="waterGoalLiters">Target (litres)</label>
+      <input type="number" id="waterGoalLiters" min="0.25" max="10" step="0.25" value="2">
+    </div>
+    <div class="update-actions">
+      <button class="btn pri" id="saveWaterGoal">Save</button>
+      <button class="btn" id="cancelWaterGoal">Cancel</button>
+    </div>
+  </section>
+</div>
+
 <script>
 /* ============================================================================
   Cal — persistent local state
@@ -1166,6 +1227,7 @@ details summary:hover{color:var(--t1)}
 const S = {
   goals:{k:2200,p:150,c:240,f:70},
   weight:70, heightCm:170, targetWeight:65, weekGoal:5,
+  waterGoalLiters:2,
   apiKey:'',
   days:{},                  // 'YYYY-MM-DD' -> {meals:[], workout:null, water:0}
   reminders:[],             // recurring natural-language reminders
@@ -1180,13 +1242,13 @@ const S = {
   healthConnectEnabled:false,
   timer:{on:false, sec:0, id:null, type:null}
 };
-
 const STORAGE_KEY = 'cal-tracker-state-v2';
 
 function saveState(){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       goals:S.goals, weight:S.weight, heightCm:S.heightCm, targetWeight:S.targetWeight, weekGoal:S.weekGoal,
+      waterGoalLiters:S.waterGoalLiters,
       apiKey:S.apiKey, days:S.days, saved:S.saved, routines:S.routines, recent:S.recent, weights:S.weights,
       weekOffset:S.weekOffset, healthConnectEnabled:S.healthConnectEnabled, reminders:S.reminders,
       mealReminderTimes:S.mealReminderTimes, mealRemindersEnabled:S.mealRemindersEnabled,
@@ -1210,6 +1272,9 @@ function loadState(){
     S.heightCm = Number(saved.heightCm) || S.heightCm;
     S.targetWeight = Number(saved.targetWeight) || S.targetWeight;
     S.weekGoal = Number(saved.weekGoal) || S.weekGoal;
+    const savedWaterGoal=Number(saved.waterGoalLiters);
+    S.waterGoalLiters=Number.isFinite(savedWaterGoal)&&savedWaterGoal>=0.25&&savedWaterGoal<=10
+      ? Math.round(savedWaterGoal*4)/4 : 2;
     S.apiKey = typeof saved.apiKey === 'string' ? saved.apiKey : '';
     S.days = saved.days && typeof saved.days === 'object' ? saved.days : {};
     S.saved = Array.isArray(saved.saved) ? saved.saved : [];
@@ -1243,6 +1308,7 @@ function createBackup(){
     exportedAt:new Date().toISOString(),
     data:{
       goals:S.goals, weight:S.weight, heightCm:S.heightCm, targetWeight:S.targetWeight, weekGoal:S.weekGoal,
+      waterGoalLiters:S.waterGoalLiters,
       days:S.days, saved:S.saved, routines:S.routines, recent:S.recent, weights:S.weights, weekOffset:S.weekOffset,
       reminders:S.reminders, mealReminderTimes:S.mealReminderTimes, mealRemindersEnabled:S.mealRemindersEnabled,
       weightReminder:S.weightReminder
@@ -1284,6 +1350,10 @@ function validateBackup(backup){
     typeof data.weightReminder.time!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.weightReminder.time))) {
     throw new Error('The backup contains invalid weight reminder settings.');
   }
+  if(data.waterGoalLiters!==undefined&&(!isNumber(data.waterGoalLiters)||data.waterGoalLiters<0.25||data.waterGoalLiters>10||
+    Math.round(data.waterGoalLiters*4)!==data.waterGoalLiters*4)) {
+    throw new Error('The backup contains an invalid water target.');
+  }
   for(const day of Object.values(data.days)){
     if(!isRecord(day)||!Array.isArray(day.meals)) throw new Error('The backup contains invalid daily records.');
   }
@@ -1299,6 +1369,7 @@ function applyBackup(data){
   S.heightCm=data.heightCm;
   S.targetWeight=data.targetWeight;
   S.weekGoal=data.weekGoal;
+  S.waterGoalLiters=Number.isFinite(data.waterGoalLiters)?data.waterGoalLiters:2;
   S.days=data.days;
   S.saved=data.saved;
   S.routines=data.routines;
@@ -1319,6 +1390,8 @@ const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const StepAggregation = window.Capacitor?.registerPlugin?.('StepAggregation');
 const BackupFiles = window.Capacitor?.registerPlugin?.('BackupFiles');
+const AppUpdater = window.Capacitor?.registerPlugin?.('AppUpdater');
+const MealCamera = window.Capacitor?.registerPlugin?.('MealCamera');
 const LocalNotifications = window.capacitorLocalNotifications?.LocalNotifications;
 const isAndroidApp = () => window.Capacitor?.getPlatform?.()==='android';
 const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1346,6 +1419,83 @@ function toast(msg, icon=''){
     setTimeout(()=>{ if(!t.classList.contains('on')) t.textContent=''; },350);
   },3000);
 }
+
+const GITHUB_LATEST_RELEASE = 'https://api.github.com/repos/mahesh-2007/Cal/releases/latest';
+const UPDATE_SNOOZED_KEY = 'cal-update-snoozed';
+let availableUpdate = null;
+
+function parseVersion(version){
+  const match=String(version||'').trim().match(/^v?(\d+(?:\.\d+){0,3})(?:[-+].*)?$/i);
+  return match ? match[1].split('.').map(Number) : null;
+}
+
+function isVersionNewer(candidate,current){
+  const next=parseVersion(candidate), installed=parseVersion(current);
+  if(!next||!installed) return false;
+  for(let i=0;i<Math.max(next.length,installed.length);i++){
+    const difference=(next[i]||0)-(installed[i]||0);
+    if(difference!==0) return difference>0;
+  }
+  return false;
+}
+
+function formatReleaseNotes(notes){
+  return notes.split('\n').map(line=>line
+    .replace(/^\s{0,3}#{1,6}\s+/, '')
+    .replace(/^\s*[-*]\s+/, '• ')
+    .replace(/^\s*\d+\.\s+/, '• ')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')).join('\n');
+}
+
+async function checkForAppUpdate(){
+  if(!isAndroidApp()||!AppUpdater) return;
+  try{
+    const current=await AppUpdater.getCurrentVersion();
+    const response=await fetch(GITHUB_LATEST_RELEASE,{headers:{Accept:'application/vnd.github+json'}});
+    if(!response.ok) throw new Error(`GitHub returned HTTP ${response.status}`);
+    const release=await response.json();
+    if(release.draft||release.prerelease||!isVersionNewer(release.tag_name,current.versionName)) return;
+    const apk=(release.assets||[]).find(asset=>
+      typeof asset.name==='string'&&asset.name.toLowerCase()==='mycalai.apk'&&
+      typeof asset.browser_download_url==='string'&&asset.browser_download_url.endsWith('.apk'));
+    if(!apk) return;
+    if(sessionStorage.getItem(UPDATE_SNOOZED_KEY)===release.tag_name) return;
+    availableUpdate={tag:release.tag_name,url:apk.browser_download_url};
+    $('#updateVersion').textContent=`${release.name||release.tag_name} · installed ${current.versionName}`;
+    $('#updateNotes').textContent=typeof release.body==='string'&&release.body.trim()
+      ? formatReleaseNotes(release.body.trim())
+      : 'This release does not include update notes.';
+    $('#updateBackdrop').style.display='grid';
+  }catch(error){
+    console.warn('Cal could not check for app updates:',error);
+  }
+}
+
+$('#updateLater').onclick=()=>{
+  if(availableUpdate) sessionStorage.setItem(UPDATE_SNOOZED_KEY,availableUpdate.tag);
+  $('#updateBackdrop').style.display='none';
+};
+$('#updateNow').onclick=async()=>{
+  if(!availableUpdate||!AppUpdater) return;
+  const button=$('#updateNow');
+  button.disabled=true;
+  button.textContent='Preparing update…';
+  try{
+    const result=await AppUpdater.installUpdate({url:availableUpdate.url});
+    if(result.permissionRequired){
+      toast('Allow installs from Cal in Android settings, then tap Update now again.','ℹ');
+      button.disabled=false;
+      button.textContent='Update now';
+      return;
+    }
+    button.textContent='Opening installer…';
+  }catch(error){
+    toast(`Could not start the update: ${error instanceof Error?error.message:String(error)}`,'⚠');
+    button.disabled=false;
+    button.textContent='Update now';
+  }
+};
 
 /* ============================================================================
    FOOD DATABASE — 90 entries, macro-per-unit
@@ -1524,6 +1674,7 @@ const GEMINI_MODELS = [
   'gemini-3.8-flash'
 ];
 let activeGeminiModel = null;
+let geminiKeyVerified = false;
 
 const PROMPT = `You are a nutrition estimator. Analyze the food described or shown.
 Return ONLY minified JSON, no markdown, no code fences, matching exactly:
@@ -1558,6 +1709,7 @@ async function geminiCall(parts, useKey){
       const txt = data.candidates?.[0]?.content?.parts?.map(p=>p.text).filter(Boolean).join('') || '';
       const parsed = parseJSON(txt);
       activeGeminiModel = model;
+      geminiKeyVerified = true;
       renderApiStatus();
       return parsed;
     }catch(e){ lastErr = e; }
@@ -1806,14 +1958,17 @@ function renderHome(){
 
   // water
   const gl = $('#glasses'); gl.innerHTML='';
-  for(let i=0;i<8;i++){
-    const e=document.createElement('div');
+  const waterServings=Math.ceil(S.waterGoalLiters*4);
+  for(let i=0;i<waterServings;i++){
+    const e=document.createElement('button');
+    e.type='button';
     e.className='gl'+(i<d.water?' on':'');
     e.textContent = i<d.water ? '💧' : '';
+    e.setAttribute('aria-label',`${i+1} of ${waterServings} 250 millilitre servings`);
     e.onclick=()=>{ d.water = (i+1===d.water)? i : i+1; saveState(); renderHome(); };
     gl.appendChild(e);
   }
-  $('#waterTxt').textContent = `${d.water} / 8 · ${(d.water*.25).toFixed(2)} L`;
+  $('#waterTxt').textContent = `${(d.water*.25).toFixed(2)} / ${S.waterGoalLiters.toFixed(2)} L`;
 
   renderReminders();
 
@@ -1850,13 +2005,44 @@ window.go = v => switchView(v);
 
 function renderApiStatus(){
   const el = $('#apiStatus'); if(!el) return;
-  const set = !!S.apiKey;
-  el.innerHTML = `<div class="gemini-credit"><span>Powered by Gemini</span><span class="gemini-dot${set?' connected':''}" role="img" aria-label="${set?'Connected':'Not connected'}" title="${set?'Connected':'Not connected'}"></span></div>`;
+  const saved=!!S.apiKey, connected=saved&&geminiKeyVerified;
+  el.innerHTML = `<div class="gemini-credit"><span>Powered by Gemini</span><span class="gemini-dot${connected?' connected':''}" role="img" aria-label="${connected?'Connected':saved?'Key saved, not tested':'Not connected'}" title="${connected?'Connected':saved?'Key saved, not tested':'Not connected'}"></span></div>`;
   const coachStatus=$('#coachAiStatus');
-  if(coachStatus) coachStatus.textContent=set?'Gemini connected':'Personal coach';
+  if(coachStatus) coachStatus.textContent=connected?'Gemini connected':saved?'Gemini key saved':'Personal coach';
   const kb=$('#keyBadge');
-  if(kb){ kb.textContent = set?'connected':'not set'; kb.className = 'badge sp '+(set?'bg-Pull':'bg-Rest'); }
+  if(kb){ kb.textContent = connected?'connected':saved?'saved':'not set'; kb.className = 'badge sp '+(connected?'bg-Pull':'bg-Rest'); }
+  const guide=$('#keyGuide');
+  if(guide) guide.hidden=connected;
 }
+
+function showKeyReminder(reason='',force=false){
+  if(sessionStorage.getItem('cal-key-reminder-shown')==='yes'&&!force) return;
+  if($('#updateBackdrop').style.display==='grid'){
+    setTimeout(()=>showKeyReminder(reason,force),400);
+    return;
+  }
+  if(reason){
+    $('#keyReminderTitle').textContent='Update your Gemini key';
+    $('#keyReminderMessage').textContent=`${reason} You can replace the key in Settings or continue using Cal without Gemini.`;
+  }else if(S.apiKey){
+    $('#keyReminderTitle').textContent='Check your Gemini key';
+    $('#keyReminderMessage').textContent='A Gemini key is saved on this device, but has not been tested in this session. You can test or update it in Settings, or continue without AI.';
+  }
+  $('#keyReminderBackdrop').style.display='grid';
+  sessionStorage.setItem('cal-key-reminder-shown','yes');
+}
+
+function isGeminiKeyError(error){
+  return /api key|key not valid|invalid.{0,20}key|permission denied/i.test(
+    error instanceof Error?error.message:String(error));
+}
+
+$('#openKeySettings').onclick=()=>{
+  $('#keyReminderBackdrop').style.display='none';
+  switchView('settings');
+  setTimeout(()=>$('#keyIn').focus(),100);
+};
+$('#continueWithoutKey').onclick=()=>$('#keyReminderBackdrop').style.display='none';
 
 /* ============================================================================
    SCAN
@@ -1870,7 +2056,23 @@ $('#modeBtn').onclick = () => {
   $('#modeBtn').textContent = mode==='photo' ? 'Text mode' : 'Photo mode';
 };
 $('#drop').onclick = () => $('#fileIn').click();
-$('#camBtn').onclick = () => $('#camIn').click();
+$('#camBtn').onclick = async() => {
+  if(!isAndroidApp()||!MealCamera){ $('#camIn').click(); return; }
+  const button=$('#camBtn');
+  button.disabled=true;
+  try{
+    const photo=await MealCamera.capture();
+    if(photo.cancelled) return;
+    const binary=atob(photo.base64);
+    const bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    loadFile(new File([bytes],'meal-camera.jpg',{type:photo.mimeType||'image/jpeg'}));
+  }catch(error){
+    toast(`Could not open the camera: ${error instanceof Error?error.message:String(error)}`,'⚠️');
+  }finally{
+    button.disabled=false;
+  }
+};
 $$('#fileIn,#camIn').forEach(i=>i.onchange=e=>loadFile(e.target.files[0]));
 ['dragover','dragenter'].forEach(ev=>$('#drop').addEventListener(ev,e=>{e.preventDefault();$('#drop').classList.add('over')}));
 ['dragleave','drop'].forEach(ev=>$('#drop').addEventListener(ev,e=>{e.preventDefault();$('#drop').classList.remove('over')}));
@@ -1928,6 +2130,11 @@ async function runAnalyze(imageB64, text){
       step.textContent = 'No food detected in the image.';
     } else if(S.apiKey){
       toast('API failed — using offline estimator','⚠️');
+      if(isGeminiKeyError(e)){
+        geminiKeyVerified=false;
+        renderApiStatus();
+        showKeyReminder('Gemini rejected the saved API key.',true);
+      }
       result = localAnalyze(text);
       result.note = `Gemini call failed (${e.message}). Showing an offline estimate.`;
       renderResult();
@@ -3044,7 +3251,7 @@ function renderCoachConversation(){
 }
 function addCoachWater(){
   const d=today();
-  if(d.water>=8){ toast('Daily water goal complete','✓'); return; }
+  if(d.water>=Math.ceil(S.waterGoalLiters*4)){ toast('Daily water goal complete','✓'); return; }
   d.water++;
   renderAll();
   toast('Glass of water logged','✓');
@@ -3088,6 +3295,11 @@ $('#askBtn').onclick = async() => {
     }
   }catch(error){
     console.warn('Cal coach request failed:',error);
+    if(S.apiKey&&isGeminiKeyError(error)){
+      geminiKeyVerified=false;
+      renderApiStatus();
+      showKeyReminder('Gemini rejected the saved API key.',true);
+    }
     coachConversation.push({role:'error',text:`Gemini could not respond: ${error instanceof Error?error.message:String(error)}`});
     coachConversation.push({role:'assistant',text:`Offline coach: ${answer(question).replace(/<[^>]*>/g,'')}`});
   }finally{
@@ -3174,6 +3386,7 @@ $('#backupFile').onchange=event=>{
 
 $('#saveKey').onclick = () => {
   const v = $('#keyIn').value.trim();
+  if(v!==S.apiKey) geminiKeyVerified=false;
   S.apiKey = v;
   saveState();
   renderApiStatus();
@@ -3185,12 +3398,43 @@ $('#testKey').onclick = async () => {
   $('#keyStep').innerHTML = '<span class="spin"></span> Testing…';
   try{
     const r = await geminiCall([{text:'Reply with only this JSON: {"ok":true}'}], v);
-    if(r && r.ok){ S.apiKey = v; saveState(); renderApiStatus(); $('#keyStep').textContent = 'Key works — photo analysis enabled.'; toast('Gemini connected','✓'); }
+    if(r && r.ok){ S.apiKey = v; geminiKeyVerified=true; saveState(); renderApiStatus(); $('#keyStep').textContent = 'Key works — photo analysis enabled.'; toast('Gemini connected','✓'); }
     else throw new Error('unexpected response');
   }catch(e){
     $('#keyStep').textContent = '';
     toast('Key test failed: '+e.message, '⚠️');
+    if(isGeminiKeyError(e)){
+      geminiKeyVerified=false;
+      renderApiStatus();
+      showKeyReminder('Google rejected that API key.',true);
+    }
   }
+};
+function closeWaterGoalDialog(){
+  $('#waterGoalBackdrop').style.display='none';
+}
+$('#editWaterGoal').onclick=()=>{
+  $('#waterGoalLiters').value=S.waterGoalLiters;
+  $('#waterGoalBackdrop').style.display='grid';
+  $('#waterGoalLiters').focus();
+};
+$('#cancelWaterGoal').onclick=closeWaterGoalDialog;
+$('#saveWaterGoal').onclick=()=>{
+  const value=Number($('#waterGoalLiters').value);
+  if(!Number.isFinite(value)||value<0.25||value>10||Math.round(value*4)!==value*4){
+    toast('Choose a water goal from 0.25 to 10 litres in 0.25-litre steps.','⚠️');
+    return;
+  }
+  const previous=S.waterGoalLiters;
+  S.waterGoalLiters=value;
+  if(!saveState()){
+    S.waterGoalLiters=previous;
+    toast('Could not save the water target on this device.','⚠️');
+    return;
+  }
+  renderHome();
+  closeWaterGoalDialog();
+  toast(`Daily water target set to ${value.toFixed(2)} L`,'✓');
 };
 $('#saveGoals').onclick = () => {
   S.goals = {k:+$('#gK').value||2200, p:+$('#gP').value||150, c:+$('#gC').value||240, f:+$('#gF').value||70};
@@ -3245,6 +3489,8 @@ $('#mealDate').value=TODAY(); $('#mealDate').max=TODAY(); $('#mealTime').value=l
 $('#stepDate').value=TODAY(); $('#stepDate').max=TODAY(); updateStepDateDisplay(); renderStepsCalendar();
 switchView('home');
 if(S.healthConnectEnabled) syncHealthSteps(false);
+checkForAppUpdate();
+if(!S.apiKey) setTimeout(()=>showKeyReminder(),600);
 </script>
 </body>
 </html>

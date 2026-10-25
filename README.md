@@ -1,71 +1,69 @@
-# MyCal AI for Android
+# MyCal AI
 
-The Android app wraps the existing `index.html` in a native Capacitor app. Keep
-editing `index.html` and `icon.jpg` in the project root; the web assets are
-copied into `www/` when building or syncing Android.
+MyCal AI is a personal food, fitness, water, and weight tracker for Android.
+Your tracker data is stored on your device; there is no account or cloud sync.
+Gemini AI is optional, and the app's core tracking and offline food estimates
+work without a Gemini key.
 
-## Requirements
+## Features
 
-- Node.js 20 or newer
-- Android Studio with the Android SDK installed
-- JDK 21. If Android Studio bundles a newer JDK, select JDK 21 in its Gradle
-  JDK setting.
+- Log meals using a photo, a meal description, or saved foods.
+- Track calories, macronutrients, workouts, steps, weight, and water.
+- Set your daily water target with the pencil button beside the water tracker.
+- Create meal and weight reminders.
+- Optionally connect Health Connect for read-only step tracking.
+- Optionally use Gemini for AI meal analysis and coaching.
+- Export and import a JSON backup of your tracker history.
 
-## Install dependencies and sync the Android project
+Nutrition and activity values are estimates, not medical advice.
 
-```sh
-npm install
-npm run android:sync
-```
+## Your data and privacy
 
-The Android project is included in this repository. Open it in Android Studio
-with `npm run android:open`, let Gradle finish syncing, then choose
-**Build > Build Bundle(s) / APK(s) > Build APK(s)**.
-The generated APK is at
-`%LOCALAPPDATA%\MyCalAI\AndroidBuild\app\outputs\apk\debug\app-debug.apk`.
-Build intermediates are kept outside the synced project folder to avoid
-OneDrive file-lock issues.
+Tracker information is saved in local storage on this device. It is not
+uploaded to a MyCal account or synced to the cloud. Clearing app data or
+uninstalling the app can erase its local data. Export a backup before moving to
+a new phone or uninstalling.
 
-Before each Android build, run `npm run android:sync` to include the latest
-changes to the web app.
+Use **Settings > Data > Export JSON** to save a backup, and **Import JSON** to
+restore one. Importing replaces the tracker history currently on this device.
+Backups do not include your Gemini API key or Health Connect permission.
 
-The app ID is `com.mycalai.app`. Change it in `capacitor.config.json` before
-publishing if you want a different permanent Android package name.
+If you use Gemini, meal photos or descriptions you submit for AI analysis are
+sent to Google's Gemini service. Your API key is stored on this device and is
+not included in backups. Gemini features need an internet connection. You can
+continue using offline tracking and food estimates without a key.
 
-## Reminders
+For Health Connect steps, the app requests read-only access. You can review
+the [privacy policy](./privacypolicy.html) for more information.
 
-On the Today screen, set separate daily reminder times for breakfast, lunch,
-dinner, and snacks. Set a weekly weight check-in by choosing its day and time
-in **Weight reminder**. In **Coach > Ask Cal**, you can also enter a reminder in
-plain language. Allow notifications and **Alarms & reminders** access when
-Android asks; exact-alarm access is needed for reminders to fire at the chosen
-time. Scheduled reminders use Android local notifications and can fire while
-the app is closed. Meal log entries also have a manually selectable time.
+## Gemini AI (optional)
 
-## Health Connect steps
+To enable AI features, open **Settings**, follow the **How to connect Gemini**
+steps, and enter your Google AI Studio key. You can also choose **Continue
+without AI** and use the app without connecting Gemini.
 
-The Android build requires Android 8.0 (API 26) or newer. On Android 14 and
-newer, Health Connect is built in; older supported phones need the Health
-Connect app installed. In MyCal AI, tap **Connect Health Connect** and allow
-step access. The app requests read-only access to steps, syncs daily totals
-when opened or returned to the foreground, and leaves manually entered totals
-unchanged. Android's Health Connect permission rationale and permission-usage
-screen display the same `privacypolicy.html` included in the app. Review it
-before distributing the app.
+## App updates
 
-## JSON backups
+When a newer version is available, MyCal AI checks for it when you open the
+app while connected to the internet. The update message lists the new
+features and shows **Update now** and **Do it later**.
 
-Open **Settings > Data > Export JSON** to save a portable copy of your tracker
-history. On Android, choose a destination in the system file picker; in a
-browser, the JSON file downloads normally. On the new device, choose
-**Import JSON** and select that file. Importing replaces tracker history on
-that device, after confirmation. The AI key and Health Connect permission are
-device-specific and are not included in backups.
+If you choose **Do it later**, you can keep using the app; the update message
+can appear again the next time you open it. If you choose **Update now**,
+Android opens its installer and asks you to approve the installation. Android
+may also ask you to allow app installs from MyCal AI. The update is not
+installed silently.
 
-## Install the APK on a phone
+The first version with in-app updates must be installed manually. After that,
+installing an update signed by the same publisher keeps your existing app and
+its local data.
 
-Copy
-`%LOCALAPPDATA%\MyCalAI\AndroidBuild\app\outputs\apk\debug\app-debug.apk`
-to the phone with a USB cable or Android file transfer. Open the APK on the
-phone and allow installation from that source when Android asks. This debug APK
-is for testing and personal use, not a Play Store release.
+## Reminders and steps
+
+Choose meal reminder times on the Today screen and set a weekly weight
+reminder in Settings. Allow notifications and alarms when Android requests
+permission.
+
+Connect Health Connect from **Steps today** and allow read-only step access.
+Health Connect is built into Android 14 and newer; older supported phones may
+need the Health Connect app installed.
