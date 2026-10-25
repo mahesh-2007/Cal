@@ -2,6 +2,11 @@
   "appId": "com.mycalai.app",
   "appName": "MyCal AI",
   "webDir": "www",
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_flame"
+    }
+  },
   "server": {
     "androidScheme": "https"
   }
