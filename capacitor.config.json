@@ -1,0 +1,8 @@
+{
+  "appId": "com.mycalai.app",
+  "appName": "MyCal AI",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}

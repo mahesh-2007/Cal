@@ -1,0 +1,39 @@
+diff --git a/node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.java b/node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.java
+index 0b826a5..42c98c5 100644
+--- a/node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.java
++++ b/node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.java
+@@ -364,6 +364,7 @@ public class LocalNotificationManager {
+         if (on != null) {
+             long trigger = on.nextTrigger(new Date());
+             notificationIntent.putExtra(TimedNotificationPublisher.CRON_KEY, on.toMatchString());
++            notificationIntent.putExtra(TimedNotificationPublisher.ALLOW_WHILE_IDLE_KEY, schedule.allowWhileIdle());
+             pendingIntent = PendingIntent.getBroadcast(context, request.getId(), notificationIntent, flags);
+             setExactIfPossible(alarmManager, schedule, trigger, pendingIntent);
+             SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+diff --git a/node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/TimedNotificationPublisher.java b/node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/TimedNotificationPublisher.java
+index 0a5c0ad..4850795 100644
+--- a/node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/TimedNotificationPublisher.java
++++ b/node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/TimedNotificationPublisher.java
+@@ -21,6 +21,7 @@ public class TimedNotificationPublisher extends BroadcastReceiver {
+ 
+     public static String NOTIFICATION_KEY = "NotificationPublisher.notification";
+     public static String CRON_KEY = "NotificationPublisher.cron";
++    public static String ALLOW_WHILE_IDLE_KEY = "NotificationPublisher.allowWhileIdle";
+ 
+     /**
+      * Restore and present notification
+@@ -76,7 +77,13 @@ public class TimedNotificationPublisher extends BroadcastReceiver {
+                     "Capacitor/LocalNotification",
+                     "Exact alarms not allowed in user settings.  Notification scheduled with non-exact alarm."
+                 );
+-                alarmManager.set(AlarmManager.RTC, trigger, pendingIntent);
++                if (intent.getBooleanExtra(ALLOW_WHILE_IDLE_KEY, false)) {
++                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pendingIntent);
++                } else {
++                    alarmManager.set(AlarmManager.RTC, trigger, pendingIntent);
++                }
++            } else if (intent.getBooleanExtra(ALLOW_WHILE_IDLE_KEY, false)) {
++                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pendingIntent);
+             } else {
+                 alarmManager.setExact(AlarmManager.RTC, trigger, pendingIntent);
+             }
