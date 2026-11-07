@@ -5,10 +5,27 @@ Your tracker data is stored on your device; there is no account or cloud sync.
 Gemini AI is optional, and the app's core tracking and offline food estimates
 work without a Gemini key.
 
+The web app is organized into `index.html` for structure, `styles.css` for
+presentation, and `app.js` for application behavior. `npm run build:web`
+copies these files and the required plugin assets into `www/`.
+
 ## Features
 
-- Log meals using a photo, a meal description, or saved foods.
+- Log meals using a photo, a meal description, or saved foods. Edit saved meal
+  nutrition and portion sizes, and choose a different portion when logging.
 - Track calories, macronutrients, workouts, steps, weight, and water.
+- Edit saved workout routines, including sets, reps, and weights.
+- View front/back muscle maps with primary and supporting regions, plus
+  estimated strength trends on-device. Muscle highlights are local exercise
+  name estimates, not measured activation.
+- See a separate estimate of workout and step calories burned today. This
+  estimate is informational only and never increases the daily calorie limit.
+- Get automatic weekly, monthly, and yearly activity recaps after each period
+  ends, with swipeable cards for meals, workouts, steps, macros, and habits.
+  Reopen recent recaps from the Coach screen.
+- Receive local notifications when a recap is ready, with a period-specific
+  tagline. Notification permission is requested only when there is recap
+  activity to notify you about.
 - Set your daily water target with the pencil button beside the water tracker.
 - Create meal and weight reminders.
 - Optionally connect Health Connect for read-only step tracking.
@@ -16,6 +33,8 @@ work without a Gemini key.
 - Export and import a JSON backup of your tracker history.
 
 Nutrition and activity values are estimates, not medical advice.
+Your daily calorie goal is an intake limit; workouts and steps do not increase
+the remaining calorie allowance.
 
 ## Your data and privacy
 
@@ -32,6 +51,10 @@ If you use Gemini, meal photos or descriptions you submit for AI analysis are
 sent to Google's Gemini service. Your API key is stored on this device and is
 not included in backups. Gemini features need an internet connection. You can
 continue using offline tracking and food estimates without a key.
+Exercise muscle highlights use the locally bundled `body-muscles` anatomy
+chart and exercise-name matching. They do not analyze or upload body photos.
+Workout and step calorie-burn estimates are also calculated on-device; step
+and workout estimates may overlap.
 
 For Health Connect steps, the app requests read-only access. You can review
 the [privacy policy](./privacypolicy.html) for more information.

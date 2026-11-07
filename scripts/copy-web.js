@@ -5,7 +5,7 @@ const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'www');
 
 fs.mkdirSync(output, { recursive: true });
-for (const file of ['index.html', 'icon.jpg', 'privacypolicy.html']) {
+for (const file of ['index.html', 'styles.css', 'app.js', 'icon.jpg', 'privacypolicy.html']) {
   fs.copyFileSync(path.join(root, file), path.join(output, file));
 }
 
@@ -21,5 +21,15 @@ fs.copyFileSync(
   path.join(root, 'node_modules', '@capacitor', 'local-notifications', 'dist', 'plugin.js'),
   path.join(output, 'local-notifications.js'),
 );
+fs.copyFileSync(
+  path.join(root, 'node_modules', 'body-muscles', 'dist', 'umd', 'body-muscles.umd.min.js'),
+  path.join(output, 'body-muscles.js'),
+);
+for (const file of ['LICENSE', 'NOTICE']) {
+  fs.copyFileSync(
+    path.join(root, 'node_modules', 'body-muscles', file),
+    path.join(output, `body-muscles-${file}`),
+  );
+}
 
 console.log('Copied web assets and Capacitor plugin runtimes into www/');
