@@ -5,6 +5,7 @@ const S = {
   goals:{k:2200,p:150,c:240,f:70},
   weight:70, heightCm:170, targetWeight:65, weekGoal:5,
   waterGoalLiters:2,
+  waterReminder:{enabled:false,intervalMinutes:120},
   apiKey:'',
   days:{},                  // 'YYYY-MM-DD' -> {meals:[], workout:null, water:0}
   reminders:[],             // recurring natural-language reminders
@@ -23,69 +24,204 @@ const S = {
   timer:{on:false, sec:0, id:null, type:null}
 };
 const STORAGE_KEY = 'cal-tracker-state-v2';
+const DATABASE_NAME = 'mycal-ai-tracker';
+const DATABASE_VERSION = 1;
+const STATE_STORE = 'tracker-state';
+let databasePromise = null;
+let stateWriteQueue = Promise.resolve();
+let persistenceFailed = false;
+let storageInitialized = false;
+let waterReminderScheduledDay = '';
 
-function saveState(){
+function storedState(){
+  return {
+    goals:S.goals, weight:S.weight, heightCm:S.heightCm, targetWeight:S.targetWeight, weekGoal:S.weekGoal,
+    waterGoalLiters:S.waterGoalLiters,
+    waterReminder:S.waterReminder,
+    apiKey:S.apiKey, days:S.days, saved:S.saved, routines:S.routines, recent:S.recent, weights:S.weights,
+    weekOffset:S.weekOffset, healthConnectEnabled:S.healthConnectEnabled, reminders:S.reminders,
+    mealReminderTimes:S.mealReminderTimes, mealRemindersEnabled:S.mealRemindersEnabled, reportSeen:S.reportSeen,
+    reportNotified:S.reportNotified, recapNotificationPermissionAsked:S.recapNotificationPermissionAsked,
+    weightReminder:S.weightReminder
+  };
+}
+
+function openStateDatabase(){
+  if(databasePromise) return databasePromise;
+  databasePromise=new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window)){
+      reject(new Error('IndexedDB is not available in this browser.'));
+      return;
+    }
+    const request=indexedDB.open(DATABASE_NAME,DATABASE_VERSION);
+    request.onupgradeneeded=()=>{
+      const database=request.result;
+      if(!database.objectStoreNames.contains(STATE_STORE)) database.createObjectStore(STATE_STORE);
+    };
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error||new Error('Could not open tracker storage.'));
+    request.onblocked=()=>reject(new Error('Tracker storage is blocked by another app window.'));
+  }).catch(error=>{
+    databasePromise=null;
+    throw error;
+  });
+  return databasePromise;
+}
+
+async function readStoredState(){
+  const database=await openStateDatabase();
+  return new Promise((resolve,reject)=>{
+    const transaction=database.transaction(STATE_STORE,'readonly');
+    const request=transaction.objectStore(STATE_STORE).get('current');
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error||new Error('Could not read tracker data.'));
+    transaction.onabort=()=>reject(transaction.error||new Error('Could not read tracker data.'));
+  });
+}
+
+async function writeStoredState(serialized){
+  const database=await openStateDatabase();
+  return new Promise((resolve,reject)=>{
+    const transaction=database.transaction(STATE_STORE,'readwrite');
+    transaction.objectStore(STATE_STORE).put(serialized,'current');
+    transaction.oncomplete=()=>resolve();
+    transaction.onerror=()=>reject(transaction.error||new Error('Could not save tracker data.'));
+    transaction.onabort=()=>reject(transaction.error||new Error('Could not save tracker data.'));
+  });
+}
+
+function removeLegacyLocalState(){
   try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      goals:S.goals, weight:S.weight, heightCm:S.heightCm, targetWeight:S.targetWeight, weekGoal:S.weekGoal,
-      waterGoalLiters:S.waterGoalLiters,
-      apiKey:S.apiKey, days:S.days, saved:S.saved, routines:S.routines, recent:S.recent, weights:S.weights,
-      weekOffset:S.weekOffset, healthConnectEnabled:S.healthConnectEnabled, reminders:S.reminders,
-      mealReminderTimes:S.mealReminderTimes, mealRemindersEnabled:S.mealRemindersEnabled, reportSeen:S.reportSeen,
-      reportNotified:S.reportNotified, recapNotificationPermissionAsked:S.recapNotificationPermissionAsked,
-      weightReminder:S.weightReminder
-    }));
-    return true;
-  }catch(e){
-    console.warn('Cal could not save local data:', e);
-    return false;
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY+'.backup');
+  }catch(error){
+    console.warn('Cal could not remove its old local storage copy:',error);
   }
 }
 
-function loadState(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return false;
-    const saved = JSON.parse(raw);
-    if(!saved || typeof saved !== 'object') return false;
-    S.goals = {...S.goals, ...(saved.goals || {})};
-    S.weight = Number(saved.weight) || S.weight;
-    S.heightCm = Number(saved.heightCm) || S.heightCm;
-    S.targetWeight = Number(saved.targetWeight) || S.targetWeight;
-    S.weekGoal = Number(saved.weekGoal) || S.weekGoal;
-    const savedWaterGoal=Number(saved.waterGoalLiters);
-    S.waterGoalLiters=Number.isFinite(savedWaterGoal)&&savedWaterGoal>=0.25&&savedWaterGoal<=10
-      ? Math.round(savedWaterGoal*4)/4 : 2;
-    S.apiKey = typeof saved.apiKey === 'string' ? saved.apiKey : '';
-    S.days = saved.days && typeof saved.days === 'object' ? saved.days : {};
-    S.saved = Array.isArray(saved.saved) ? saved.saved.map(meal=>({
-      ...meal,
-      servingAmount:Number(meal.servingAmount)>0?Number(meal.servingAmount):1,
-      servingUnit:['serving','g','ml','piece'].includes(meal.servingUnit)?meal.servingUnit:'serving'
-    })) : [];
-    S.routines = Array.isArray(saved.routines) ? saved.routines : [];
-    S.recent = Array.isArray(saved.recent) ? saved.recent : [];
-    S.weights = Array.isArray(saved.weights) ? saved.weights : [];
-    S.weekOffset = Number(saved.weekOffset) || 0;
-    S.reportSeen=Array.isArray(saved.reportSeen)?saved.reportSeen.filter(value=>typeof value==='string').slice(-200):[];
-    S.reportNotified=Array.isArray(saved.reportNotified)?saved.reportNotified.filter(value=>typeof value==='string').slice(-200):[];
-    S.recapNotificationPermissionAsked=saved.recapNotificationPermissionAsked===true;
-    S.healthConnectEnabled = saved.healthConnectEnabled === true;
-    S.reminders = Array.isArray(saved.reminders) ? saved.reminders.filter(r=>
-      r&&Number.isInteger(r.id)&&typeof r.title==='string'&&typeof r.body==='string'&&
-      Number.isInteger(r.hour)&&r.hour>=0&&r.hour<=23&&Number.isInteger(r.minute)&&r.minute>=0&&r.minute<=59&&
-      ['daily','weekly'].includes(r.frequency)&&(!r.weekday||(Number.isInteger(r.weekday)&&r.weekday>=1&&r.weekday<=7))) : [];
-    S.mealReminderTimes = {...S.mealReminderTimes, ...(saved.mealReminderTimes || {})};
-    S.mealRemindersEnabled = saved.mealRemindersEnabled === true;
-    if(saved.weightReminder&&typeof saved.weightReminder==='object'&&
-       Number.isInteger(saved.weightReminder.weekday)&&saved.weightReminder.weekday>=1&&saved.weightReminder.weekday<=7&&
-       /^([01]\d|2[0-3]):[0-5]\d$/.test(saved.weightReminder.time||'')){
-      S.weightReminder={enabled:saved.weightReminder.enabled===true,weekday:saved.weightReminder.weekday,time:saved.weightReminder.time};
+function isStorageQuotaError(error){
+  return error?.name==='QuotaExceededError'||error?.name==='NS_ERROR_DOM_QUOTA_REACHED'||
+    error?.code===22||error?.code===1014;
+}
+
+function removeMealPhotos(){
+  for(const day of Object.values(S.days)){
+    if(Array.isArray(day?.meals)){
+      for(const meal of day.meals){
+        if(meal&&typeof meal==='object') meal.img=null;
+      }
     }
+  }
+  for(const meal of S.recent){
+    if(meal&&typeof meal==='object') meal.img=null;
+  }
+}
+
+function saveState(){
+  if(persistenceFailed){
+    toast('Tracker data is not being saved. Restart the app and try again.');
+    return Promise.resolve(false);
+  }
+  let serialized;
+  try{
+    serialized=JSON.stringify(storedState());
+  }catch(e){
+    console.warn('Cal could not prepare tracker data for saving:',e);
+    toast('Could not prepare tracker data for saving.');
+    return Promise.resolve(false);
+  }
+  const write=async()=>{
+    try{
+      await writeStoredState(serialized);
+      return true;
+    }catch(error){
+      if(isStorageQuotaError(error)){
+        removeMealPhotos();
+        try{
+          await writeStoredState(JSON.stringify(storedState()));
+          console.warn('Cal removed saved meal photos to make room for tracker data.');
+          return true;
+        }catch(retryError){
+          console.warn('Cal could not save tracker data after removing meal photos:',retryError);
+          toast('Could not save tracker data on this device. Export a backup and free some app storage.');
+          return false;
+        }
+      }
+      console.warn('Cal could not save tracker data:',error);
+      toast('Could not save tracker data on this device.');
+      return false;
+    }
+  };
+  const pending=stateWriteQueue.then(write,write);
+  stateWriteQueue=pending.then(()=>undefined);
+  return pending;
+}
+
+function applyStoredState(saved){
+  if(!saved||typeof saved!=='object'||Array.isArray(saved)) throw new Error('Saved tracker data is invalid.');
+  S.goals = {...S.goals, ...(saved.goals || {})};
+  S.weight = Number(saved.weight) || S.weight;
+  S.heightCm = Number(saved.heightCm) || S.heightCm;
+  S.targetWeight = Number(saved.targetWeight) || S.targetWeight;
+  S.weekGoal = Number(saved.weekGoal) || S.weekGoal;
+  const savedWaterGoal=Number(saved.waterGoalLiters);
+  S.waterGoalLiters=Number.isFinite(savedWaterGoal)&&savedWaterGoal>=0.25&&savedWaterGoal<=10
+    ? Math.round(savedWaterGoal*4)/4 : 2;
+  const waterReminder=saved.waterReminder;
+  if(waterReminder&&typeof waterReminder==='object'&&typeof waterReminder.enabled==='boolean'&&
+     Number.isInteger(waterReminder.intervalMinutes)&&waterReminder.intervalMinutes>=30&&
+     waterReminder.intervalMinutes<=720&&waterReminder.intervalMinutes%30===0){
+    S.waterReminder={enabled:waterReminder.enabled,intervalMinutes:waterReminder.intervalMinutes};
+  }else{
+    S.waterReminder={enabled:false,intervalMinutes:120};
+  }
+  S.apiKey = typeof saved.apiKey === 'string' ? saved.apiKey : '';
+  S.days = saved.days && typeof saved.days === 'object' && !Array.isArray(saved.days) ? saved.days : {};
+  S.saved = Array.isArray(saved.saved) ? saved.saved.map(meal=>({
+    ...meal,
+    servingAmount:Number(meal.servingAmount)>0?Number(meal.servingAmount):1,
+    servingUnit:['serving','g','ml','piece'].includes(meal.servingUnit)?meal.servingUnit:'serving'
+  })) : [];
+  S.routines = Array.isArray(saved.routines) ? saved.routines : [];
+  S.recent = Array.isArray(saved.recent) ? saved.recent : [];
+  S.weights = Array.isArray(saved.weights) ? saved.weights : [];
+  S.weekOffset = Number(saved.weekOffset) || 0;
+  S.reportSeen=Array.isArray(saved.reportSeen)?saved.reportSeen.filter(value=>typeof value==='string').slice(-200):[];
+  S.reportNotified=Array.isArray(saved.reportNotified)?saved.reportNotified.filter(value=>typeof value==='string').slice(-200):[];
+  S.recapNotificationPermissionAsked=saved.recapNotificationPermissionAsked===true;
+  S.healthConnectEnabled = saved.healthConnectEnabled === true;
+  S.reminders = Array.isArray(saved.reminders) ? saved.reminders.filter(r=>
+    r&&Number.isInteger(r.id)&&typeof r.title==='string'&&typeof r.body==='string'&&
+    Number.isInteger(r.hour)&&r.hour>=0&&r.hour<=23&&Number.isInteger(r.minute)&&r.minute>=0&&r.minute<=59&&
+    ['daily','weekly'].includes(r.frequency)&&(!r.weekday||(Number.isInteger(r.weekday)&&r.weekday>=1&&r.weekday<=7))) : [];
+  S.mealReminderTimes = {...S.mealReminderTimes, ...(saved.mealReminderTimes || {})};
+  S.mealRemindersEnabled = saved.mealRemindersEnabled === true;
+  if(saved.weightReminder&&typeof saved.weightReminder==='object'&&
+     Number.isInteger(saved.weightReminder.weekday)&&saved.weightReminder.weekday>=1&&saved.weightReminder.weekday<=7&&
+     /^([01]\d|2[0-3]):[0-5]\d$/.test(saved.weightReminder.time||'')){
+    S.weightReminder={enabled:saved.weightReminder.enabled===true,weekday:saved.weightReminder.weekday,time:saved.weightReminder.time};
+  }
+}
+
+async function loadState(){
+  try{
+    let raw=await readStoredState();
+    if(typeof raw!=='string'){
+      raw=localStorage.getItem(STORAGE_KEY);
+      if(!raw) return false;
+      const legacyState=JSON.parse(raw);
+      applyStoredState(legacyState);
+      if(!await saveState()) throw new Error('Could not migrate existing tracker data to the new storage.');
+      removeLegacyLocalState();
+      return true;
+    }
+    applyStoredState(JSON.parse(raw));
+    removeLegacyLocalState();
     return true;
   }catch(e){
-    console.warn('Cal could not load local data:', e);
-    return false;
+    persistenceFailed=true;
+    console.warn('Cal could not load tracker data:',e);
+    throw e;
   }
 }
 
@@ -97,6 +233,7 @@ function createBackup(){
     data:{
       goals:S.goals, weight:S.weight, heightCm:S.heightCm, targetWeight:S.targetWeight, weekGoal:S.weekGoal,
       waterGoalLiters:S.waterGoalLiters,
+      waterReminder:S.waterReminder,
       days:S.days, saved:S.saved, routines:S.routines, recent:S.recent, weights:S.weights, weekOffset:S.weekOffset,
       reminders:S.reminders, mealReminderTimes:S.mealReminderTimes, mealRemindersEnabled:S.mealRemindersEnabled,
       weightReminder:S.weightReminder, reportSeen:S.reportSeen
@@ -142,6 +279,11 @@ function validateBackup(backup){
     Math.round(data.waterGoalLiters*4)!==data.waterGoalLiters*4)) {
     throw new Error('The backup contains an invalid water target.');
   }
+  if(data.waterReminder!==undefined&&(!isRecord(data.waterReminder)||typeof data.waterReminder.enabled!=='boolean'||
+     !Number.isInteger(data.waterReminder.intervalMinutes)||data.waterReminder.intervalMinutes<30||
+     data.waterReminder.intervalMinutes>720||data.waterReminder.intervalMinutes%30!==0)){
+    throw new Error('The backup contains invalid water reminder settings.');
+  }
   if(data.reportSeen!==undefined&&(!Array.isArray(data.reportSeen)||data.reportSeen.length>200||
     data.reportSeen.some(value=>typeof value!=='string'||value.length>40))) {
     throw new Error('The backup contains invalid recap history.');
@@ -152,16 +294,16 @@ function validateBackup(backup){
   return data;
 }
 
-function applyBackup(data){
+async function applyBackup(data){
   const previous={...S};
-  const current=localStorage.getItem(STORAGE_KEY)||'';
-  localStorage.setItem(STORAGE_KEY+'.backup',current);
   S.goals={...data.goals};
   S.weight=data.weight;
   S.heightCm=data.heightCm;
   S.targetWeight=data.targetWeight;
   S.weekGoal=data.weekGoal;
   S.waterGoalLiters=Number.isFinite(data.waterGoalLiters)?data.waterGoalLiters:2;
+  S.waterReminder=data.waterReminder&&typeof data.waterReminder==='object'
+    ? {...data.waterReminder} : {enabled:false,intervalMinutes:120};
   S.days=data.days;
   S.saved=data.saved.map(meal=>({
     ...meal,
@@ -178,7 +320,7 @@ function applyBackup(data){
   S.mealReminderTimes={Breakfast:'08:00',Lunch:'13:00',Dinner:'19:00',Snack:'16:00',...(data.mealReminderTimes||{})};
   S.mealRemindersEnabled=data.mealRemindersEnabled===true;
   S.weightReminder={enabled:false,weekday:1,time:'09:00',...(data.weightReminder||{})};
-  if(!saveState()){
+  if(!await saveState()){
     Object.assign(S,previous);
     throw new Error('Could not save the imported backup on this device. Free up storage and try again.');
   }
@@ -218,6 +360,23 @@ function toast(msg){
   },3000);
 }
 
+async function logMeal(meal, dayKey=TODAY(), addToRecent=false){
+  const previousDay=S.days[dayKey];
+  const day=D(dayKey);
+  const previousRecent=addToRecent?S.recent.slice():null;
+  day.meals.push(meal);
+  if(addToRecent){
+    S.recent.unshift({...meal});
+    S.recent=S.recent.slice(0,8);
+  }
+  if(await saveState()) return true;
+  if(previousDay) day.meals.pop();
+  else delete S.days[dayKey];
+  if(previousRecent) S.recent=previousRecent;
+  toast('Could not save this food on the device. Free up storage and try again.');
+  return false;
+}
+
 const GITHUB_LATEST_RELEASE = 'https://api.github.com/repos/mahesh-2007/Cal/releases/latest';
 const UPDATE_SNOOZED_KEY = 'cal-update-snoozed';
 let availableUpdate = null;
@@ -250,6 +409,7 @@ async function checkForAppUpdate(){
   if(!isAndroidApp()||!AppUpdater) return;
   try{
     const current=await AppUpdater.getCurrentVersion();
+    $('#appVersionBadge').textContent=`Stable v${current.versionName}`;
     const response=await fetch(GITHUB_LATEST_RELEASE,{headers:{Accept:'application/vnd.github+json'}});
     if(!response.ok) throw new Error(`GitHub returned HTTP ${response.status}`);
     const release=await response.json();
@@ -764,7 +924,12 @@ function renderHome(){
     e.className='gl'+(i<d.water?' on':'');
     e.textContent = '';
     e.setAttribute('aria-label',`${i<d.water?'Logged':'Log'} water serving ${i+1} of ${waterServings}`);
-    e.onclick=()=>{ d.water = (i+1===d.water)? i : i+1; saveState(); renderHome(); };
+    e.onclick=()=>{
+      const previous=d.water;
+      d.water=(i+1===d.water)?i:i+1;
+      saveState(); renderHome();
+      updateWaterRemindersAfterProgress(previous,d.water);
+    };
     gl.appendChild(e);
   }
   $('#waterTxt').textContent = `${(d.water*.25).toFixed(2)} / ${S.waterGoalLiters.toFixed(2)} L`;
@@ -1056,7 +1221,7 @@ window.saveResultToLibrary = () => {
   if(button){ button.textContent='Saved'; button.disabled=true; }
   toast('Meal saved for quick add');
 };
-window.saveResult = () => {
+window.saveResult = async() => {
   if(!result) return;
   const savedMeal=resultMealData();
   const meal = {
@@ -1066,8 +1231,7 @@ window.saveResult = () => {
     at: mealTimeLabel($('#mealTime').value)
   };
   const logKey = $('#mealDate').value || TODAY();
-  D(logKey).meals.push(meal);
-  S.recent.unshift({...meal, img: meal.img}); S.recent = S.recent.slice(0,8);
+  if(!await logMeal(meal,logKey,true)) return;
   if(!pendingImg) $('#textIn').value='';
   discard(); renderAll();
   toast(`Added ${num(meal.kcal)} kcal to ${logKey===TODAY()?'today':nice(logKey)}`,'✓');
@@ -1554,7 +1718,11 @@ function renderHealthConnectStatus(){
 
 $('#healthStepsConnect').onclick=()=>syncHealthSteps(true);
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible'&&S.healthConnectEnabled) syncHealthSteps(false);
+  if(document.visibilityState!=='visible') return;
+  if(S.healthConnectEnabled) syncHealthSteps(false);
+  if(S.waterReminder.enabled&&waterReminderScheduledDay!==TODAY()){
+    refreshWaterReminderNotifications(false).catch(error=>console.warn('Cal could not refresh water reminders:',error));
+  }
 });
 
 function renderStepsCalendar(){
@@ -1854,7 +2022,7 @@ function syncRecapNotifications(){
       planned.some(notification=>notification.extra?.recapId===report.id));
     if(newlyNotified.length){
       S.reportNotified=[...new Set([...S.reportNotified,...newlyNotified.map(report=>report.id)])].slice(-200);
-      if(!saveState()) console.warn('Cal could not save which recap notifications were scheduled.');
+      if(!await saveState()) console.warn('Cal could not save which recap notifications were scheduled.');
     }
   })();
 }
@@ -2026,13 +2194,13 @@ function showNextAutomaticRecap(){
   if(report&&!S.reportSeen.includes(report.id)&&report.hasActivity) openRecap(report);
   else showNextAutomaticRecap();
 }
-function closeRecap(){
+async function closeRecap(){
   if(!activeRecap) return;
   const recapId=activeRecap.id;
   const wasSeen=S.reportSeen.includes(activeRecap.id);
   if(!wasSeen){
     S.reportSeen=[...S.reportSeen,activeRecap.id].slice(-200);
-    if(!saveState()) toast('Recap closed, but its viewed status could not be saved.');
+    if(!await saveState()) toast('Recap closed, but its viewed status could not be saved.');
   }
   activeRecap=null;
   $('#recapBackdrop').style.display='none';
@@ -2286,30 +2454,30 @@ function renderLibrary(){
     </div>`;
   }).join('') : `<div class="empty"><div class="tx">Log meals to build quick additions</div></div>`;
 }
-window.relog = i => {
+window.relog = async i => {
   const m = S.saved[i];
   if(!m) return;
   const amount=Number($(`#savedAmount${i}`).value), baseAmount=Number(m.servingAmount)||1;
   if(!Number.isFinite(amount)||amount<=0||(m.servingUnit==='piece'&&!Number.isInteger(amount))){ toast('Enter a valid portion amount.'); return; }
   const factor=amount/baseAmount, unit=m.servingUnit||'serving';
-  today().meals.push({
+  if(!await logMeal({
     name:m.name,kcal:Math.round(Number(m.kcal)*factor),
     protein:+(Number(m.protein||0)*factor).toFixed(1),carbs:+(Number(m.carbs||0)*factor).toFixed(1),fat:+(Number(m.fat||0)*factor).toFixed(1),
     img:null,type:m.type||'Snack',src:'saved',portion:`${amount} ${unit}`,servingAmount:amount,servingUnit:unit,
     at:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
-  });
+  })) return;
   renderAll(); toast(`Logged ${m.name}`);
 };
-window.relogItem = (n,k,p,c,f) => {
-  today().meals.push({name:n, kcal:k, protein:p, carbs:c, fat:f, img:null, type:'Snack', src:'saved',
-    at:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
+window.relogItem = async(n,k,p,c,f) => {
+  if(!await logMeal({name:n, kcal:k, protein:p, carbs:c, fat:f, img:null, type:'Snack', src:'saved',
+    at:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})})) return;
   renderAll(); toast(`Logged ${n}`,'✓');
 };
-window.logQuickMeal = i => {
+window.logQuickMeal = async i => {
   const m = quickMeals[i];
   if(!m) return;
-  today().meals.push({name:m.n, kcal:m.kcal, protein:m.p, carbs:m.c, fat:m.f, img:null, type:'Quick add', src:'saved',
-    at:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
+  if(!await logMeal({name:m.n, kcal:m.kcal, protein:m.p, carbs:m.c, fat:m.f, img:null, type:'Quick add', src:'saved',
+    at:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})})) return;
   renderAll(); toast(`Logged ${m.n}`,'✓');
 };
 window.saveQuickMeal = i => {
@@ -2320,6 +2488,27 @@ window.saveQuickMeal = i => {
 };
 window.unsave = i => { S.saved.splice(i,1); saveState(); renderLibrary(); toast('Removed'); };
 let savedMealEditIndex=null;
+let savedMealNutritionBase=null;
+const SAVED_MEAL_NUTRITION_FIELDS=['savedMealKcal','savedMealProtein','savedMealCarbs','savedMealFat'];
+function currentSavedMealNutrition(){
+  return Object.fromEntries(SAVED_MEAL_NUTRITION_FIELDS.map(id=>[id,Number($('#'+id).value)]));
+}
+function rebaseSavedMealNutrition(){
+  const amount=Number($('#savedMealAmount').value);
+  const nutrition=currentSavedMealNutrition();
+  if(Number.isFinite(amount)&&amount>0&&Object.values(nutrition).every(Number.isFinite)){
+    savedMealNutritionBase={amount,nutrition};
+  }
+}
+function updateSavedMealNutritionForPortion(){
+  const amount=Number($('#savedMealAmount').value);
+  if(!savedMealNutritionBase||!Number.isFinite(amount)||amount<=0) return;
+  const factor=amount/savedMealNutritionBase.amount;
+  SAVED_MEAL_NUTRITION_FIELDS.forEach(id=>{
+    const value=savedMealNutritionBase.nutrition[id]*factor;
+    $('#'+id).value=id==='savedMealKcal'?Math.round(value):value.toFixed(1);
+  });
+}
 window.editSavedMeal=i=>{
   const meal=S.saved[i];
   if(!meal) return;
@@ -2332,15 +2521,24 @@ window.editSavedMeal=i=>{
   $('#savedMealProtein').value=Number(meal.protein)||0;
   $('#savedMealCarbs').value=Number(meal.carbs)||0;
   $('#savedMealFat').value=Number(meal.fat)||0;
+  rebaseSavedMealNutrition();
   $('#savedMealBackdrop').style.display='grid';
   $('#savedMealName').focus();
 };
+$('#savedMealAmount').addEventListener('input',updateSavedMealNutritionForPortion);
+SAVED_MEAL_NUTRITION_FIELDS.forEach(id=>$('#'+id).addEventListener('input',()=>{
+  const amount=Number($('#savedMealAmount').value);
+  const value=Number($('#'+id).value);
+  if(!savedMealNutritionBase||!Number.isFinite(amount)||amount<=0||!Number.isFinite(value)||value<0) return;
+  savedMealNutritionBase.nutrition[id]=value*savedMealNutritionBase.amount/amount;
+}));
 $('#savedMealUnit').onchange=()=>{
   $('#savedMealAmount').step=$('#savedMealUnit').value==='piece'?'1':'0.1';
+  rebaseSavedMealNutrition();
 };
-function closeSavedMealDialog(){ $('#savedMealBackdrop').style.display='none'; }
+function closeSavedMealDialog(){ $('#savedMealBackdrop').style.display='none'; savedMealNutritionBase=null; }
 $('#cancelSavedMeal').onclick=closeSavedMealDialog;
-$('#saveSavedMeal').onclick=()=>{
+$('#saveSavedMeal').onclick=async()=>{
   const meal=S.saved[savedMealEditIndex];
   if(!meal) return;
   const name=$('#savedMealName').value.trim(), servingAmount=Number($('#savedMealAmount').value);
@@ -2365,12 +2563,13 @@ $('#saveSavedMeal').onclick=()=>{
     name,kcal:Math.round(kcal),protein:+protein.toFixed(1),carbs:+carbs.toFixed(1),fat:+fat.toFixed(1),
     servingAmount:servingUnit==='piece'?servingAmount:+servingAmount.toFixed(2),servingUnit
   });
-  if(!saveState()){
+  if(!await saveState()){
     Object.assign(meal,previous);
     toast('Could not save this meal on the device.');
     return;
   }
   savedMealEditIndex=null;
+  savedMealNutritionBase=null;
   closeSavedMealDialog();
   renderLibrary();
   toast('Saved meal updated');
@@ -2430,6 +2629,9 @@ function answer(q){
 }
 const MEAL_REMINDER_ID = 700000;
 const WEIGHT_REMINDER_ID = 700004;
+const WATER_REMINDER_ID = 800000;
+const WATER_REMINDER_DAYS = 7;
+const WATER_REMINDER_SLOTS_PER_DAY = 32;
 const MEAL_REMINDER_TYPES = ['Breakfast','Lunch','Dinner','Snack'];
 const WEEKDAYS = {sunday:1,monday:2,tuesday:3,wednesday:4,thursday:5,friday:6,saturday:7};
 const WEEKDAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -2494,6 +2696,87 @@ async function ensureReminderPermission(){
 async function cancelReminderNotifications(ids){
   if(!LocalNotifications||!ids.length) return;
   await LocalNotifications.cancel({notifications:ids.map(id=>({id}))});
+}
+
+function waterReminderIdsForDay(dayOffset){
+  return Array.from({length:WATER_REMINDER_SLOTS_PER_DAY},(_,slot)=>
+    WATER_REMINDER_ID+dayOffset*WATER_REMINDER_SLOTS_PER_DAY+slot);
+}
+
+function allWaterReminderIds(){
+  return Array.from({length:WATER_REMINDER_DAYS*WATER_REMINDER_SLOTS_PER_DAY},(_,index)=>WATER_REMINDER_ID+index);
+}
+
+function buildWaterReminderNotifications(){
+  const notifications=[], now=new Date(), intervalMs=S.waterReminder.intervalMinutes*60*1000;
+  for(let dayOffset=0;dayOffset<WATER_REMINDER_DAYS;dayOffset++){
+    const date=new Date(now.getFullYear(),now.getMonth(),now.getDate()+dayOffset);
+    const dayKey=dkey(date);
+    if(dayOffset===0&&(Number(S.days[dayKey]?.water)||0)>=Math.ceil(S.waterGoalLiters*4)) continue;
+    const start=new Date(date.getFullYear(),date.getMonth(),date.getDate(),8,0,0,0);
+    let next=dayOffset===0&&now>start?new Date(now.getTime()+intervalMs):new Date(start.getTime()+intervalMs);
+    const end=new Date(date.getFullYear(),date.getMonth(),date.getDate(),22,0,0,0);
+    let slot=0;
+    while(next<=end&&slot<WATER_REMINDER_SLOTS_PER_DAY){
+      if(next>now){
+        notifications.push({
+          id:WATER_REMINDER_ID+dayOffset*WATER_REMINDER_SLOTS_PER_DAY+slot,
+          title:'Time to drink water',
+          body:'Log a glass of water to keep moving toward your daily target.',
+          channelId:'cal-reminders',
+          schedule:{at:next,allowWhileIdle:true}
+        });
+      }
+      next=new Date(next.getTime()+intervalMs);
+      slot++;
+    }
+  }
+  return notifications;
+}
+
+async function refreshWaterReminderNotifications(requestPermission=false){
+  if(!LocalNotifications){
+    if(requestPermission) throw new Error('Notification support is unavailable. Rebuild and sync the Android app, then try again.');
+    return;
+  }
+  if(requestPermission&&S.waterReminder.enabled) await ensureReminderPermission();
+  await cancelReminderNotifications(allWaterReminderIds());
+  if(!S.waterReminder.enabled) return;
+  if(!requestPermission){
+    const permission=await LocalNotifications.checkPermissions();
+    if(permission.display!=='granted'){
+      waterReminderScheduledDay=TODAY();
+      return;
+    }
+    if(isAndroidApp()){
+      const exactAlarm=await LocalNotifications.checkExactNotificationSetting();
+      if(exactAlarm.exact_alarm!=='granted'){
+        waterReminderScheduledDay=TODAY();
+        return;
+      }
+      await LocalNotifications.createChannel({
+        id:'cal-reminders',name:'Cal reminders',description:'Meal, water, and personal reminders',importance:4
+      });
+    }
+  }
+  const notifications=buildWaterReminderNotifications();
+  if(notifications.length) await LocalNotifications.schedule({notifications});
+  waterReminderScheduledDay=TODAY();
+}
+
+async function updateWaterRemindersAfterProgress(previousCount,currentCount){
+  if(!S.waterReminder.enabled) return;
+  const goal=Math.ceil(S.waterGoalLiters*4), wasComplete=previousCount>=goal, isComplete=currentCount>=goal;
+  try{
+    if(!wasComplete&&isComplete){
+      await cancelReminderNotifications(waterReminderIdsForDay(0));
+    }else if(wasComplete&&!isComplete){
+      await refreshWaterReminderNotifications(false);
+    }
+  }catch(error){
+    console.warn('Cal could not update water reminders:',error);
+    toast('Water was logged, but its reminder could not be updated.');
+  }
 }
 
 async function syncReminderNotifications(previousIds=[]){
@@ -2568,7 +2851,7 @@ async function addReminderFromCommand(text){
     schedule:reminderSchedule(reminder)
   }]});
   S.reminders.push(reminder);
-  if(!saveState()) throw new Error('The reminder could not be saved on this device.');
+  if(!await saveState()) throw new Error('The reminder could not be saved on this device.');
   renderReminders();
   return reminder;
 }
@@ -2596,7 +2879,7 @@ $('#saveMealReminders').onclick=async()=>{
     await cancelReminderNotifications(MEAL_REMINDER_TYPES.map((_,index)=>MEAL_REMINDER_ID+index));
     await LocalNotifications.schedule({notifications});
     S.mealReminderTimes=times; S.mealRemindersEnabled=true;
-    if(!saveState()) throw new Error('Reminder settings could not be saved on this device.');
+    if(!await saveState()) throw new Error('Reminder settings could not be saved on this device.');
     renderReminders(); toast('Daily meal and snack reminders are on','✓');
   }catch(error){ toast(`Could not set reminders: ${error.message}`); }
 };
@@ -2622,7 +2905,7 @@ $('#saveWeightReminder').onclick=async()=>{
       channelId:'cal-reminders',schedule:{on:{weekday,hour,minute},allowWhileIdle:true}
     }]});
     S.weightReminder={enabled:true,weekday,time};
-    if(!saveState()){
+    if(!await saveState()){
       S.weightReminder=previous;
       await cancelReminderNotifications([WEIGHT_REMINDER_ID]);
       if(previous.enabled){
@@ -2642,7 +2925,7 @@ $('#disableWeightReminder').onclick=async()=>{
   try{
     await cancelReminderNotifications([WEIGHT_REMINDER_ID]);
     S.weightReminder.enabled=false;
-    if(!saveState()){
+    if(!await saveState()){
       S.weightReminder=previous;
       const [hour,minute]=previous.time.split(':').map(Number);
       await LocalNotifications.schedule({notifications:[{
@@ -2663,8 +2946,10 @@ function renderCoachConversation(){
 function addCoachWater(){
   const d=today();
   if(d.water>=Math.ceil(S.waterGoalLiters*4)){ toast('Daily water goal complete','✓'); return; }
+  const previous=d.water;
   d.water++;
   renderAll();
+  updateWaterRemindersAfterProgress(previous,d.water);
   toast('Glass of water logged','✓');
 }
 $('#askBtn').onclick = async() => {
@@ -2756,9 +3041,12 @@ async function importBackupText(text){
   catch{ throw new Error('The selected file is not valid JSON.'); }
   const data=validateBackup(backup);
   if(!window.confirm('Replace this device’s tracker data with the selected backup? Your AI key and Health Connect permission will stay unchanged.')) return false;
-  const previousReminderIds=[...S.reminders.map(reminder=>reminder.id),...MEAL_REMINDER_TYPES.map((_,index)=>MEAL_REMINDER_ID+index),WEIGHT_REMINDER_ID];
-  applyBackup(data);
-  try{ await syncReminderNotifications(previousReminderIds); }
+  const previousReminderIds=[...S.reminders.map(reminder=>reminder.id),...MEAL_REMINDER_TYPES.map((_,index)=>MEAL_REMINDER_ID+index),WEIGHT_REMINDER_ID,...allWaterReminderIds()];
+  await applyBackup(data);
+  try{
+    await syncReminderNotifications(previousReminderIds);
+    await refreshWaterReminderNotifications(false);
+  }
   catch(error){ toast(`Backup imported, but reminders could not be restored: ${error.message}`); }
   renderAll();
   $('#gK').value=S.goals.k; $('#gP').value=S.goals.p; $('#gC').value=S.goals.c; $('#gF').value=S.goals.f;
@@ -2826,26 +3114,52 @@ function closeWaterGoalDialog(){
 }
 $('#editWaterGoal').onclick=()=>{
   $('#waterGoalLiters').value=S.waterGoalLiters;
+  $('#waterReminderEnabled').checked=S.waterReminder.enabled;
+  $('#waterReminderInterval').value=String(S.waterReminder.intervalMinutes);
+  $('#waterReminderInterval').disabled=!S.waterReminder.enabled;
   $('#waterGoalBackdrop').style.display='grid';
   $('#waterGoalLiters').focus();
 };
 $('#cancelWaterGoal').onclick=closeWaterGoalDialog;
-$('#saveWaterGoal').onclick=()=>{
+$('#waterReminderEnabled').onchange=()=>{
+  $('#waterReminderInterval').disabled=!$('#waterReminderEnabled').checked;
+};
+$('#saveWaterGoal').onclick=async()=>{
   const value=Number($('#waterGoalLiters').value);
   if(!Number.isFinite(value)||value<0.25||value>10||Math.round(value*4)!==value*4){
     toast('Choose a water goal from 0.25 to 10 litres in 0.25-litre steps.');
     return;
   }
-  const previous=S.waterGoalLiters;
+  const intervalMinutes=Number($('#waterReminderInterval').value);
+  if(!Number.isInteger(intervalMinutes)||intervalMinutes<30||intervalMinutes>720||intervalMinutes%30!==0){
+    toast('Choose a water reminder interval from 30 minutes to 12 hours.');
+    return;
+  }
+  const previous={waterGoalLiters:S.waterGoalLiters,waterReminder:{...S.waterReminder}};
   S.waterGoalLiters=value;
-  if(!saveState()){
-    S.waterGoalLiters=previous;
+  S.waterReminder={enabled:$('#waterReminderEnabled').checked,intervalMinutes};
+  if(!await saveState()){
+    S.waterGoalLiters=previous.waterGoalLiters;
+    S.waterReminder=previous.waterReminder;
     toast('Could not save the water target on this device.');
+    return;
+  }
+  try{
+    await refreshWaterReminderNotifications(S.waterReminder.enabled);
+  }catch(error){
+    S.waterGoalLiters=previous.waterGoalLiters;
+    S.waterReminder=previous.waterReminder;
+    await saveState();
+    try{ await refreshWaterReminderNotifications(false); }
+    catch(restoreError){ console.warn('Cal could not restore the previous water reminder:',restoreError); }
+    toast(`Could not update water reminders: ${error.message}`);
     return;
   }
   renderHome();
   closeWaterGoalDialog();
-  toast(`Daily water target set to ${value.toFixed(2)} L`,'✓');
+  toast(S.waterReminder.enabled
+    ? `Water target set to ${value.toFixed(2)} L · reminder every ${S.waterReminder.intervalMinutes<60?`${S.waterReminder.intervalMinutes} minutes`:`${S.waterReminder.intervalMinutes/60} hours`}`
+    : `Daily water target set to ${value.toFixed(2)} L`,'✓');
 };
 $('#saveGoals').onclick = () => {
   S.goals = {k:+$('#gK').value||2200, p:+$('#gP').value||150, c:+$('#gC').value||240, f:+$('#gF').value||70};
@@ -2861,10 +3175,11 @@ $('#bodyW').onchange = e => { S.weight = +e.target.value||70; $('#setW').value =
 $('#weekGoal').onchange = e => { S.weekGoal = +e.target.value||5; renderAll(); };
 $('#resetAll').onclick = async() => {
   try{
-    await cancelReminderNotifications([...S.reminders.map(reminder=>reminder.id),...MEAL_REMINDER_TYPES.map((_,index)=>MEAL_REMINDER_ID+index),WEIGHT_REMINDER_ID]);
+    await cancelReminderNotifications([...S.reminders.map(reminder=>reminder.id),...MEAL_REMINDER_TYPES.map((_,index)=>MEAL_REMINDER_ID+index),WEIGHT_REMINDER_ID,...allWaterReminderIds()]);
   }catch(error){ toast(`Could not cancel reminders: ${error.message}`); return; }
   S.days={}; S.saved=[]; S.routines=[]; S.recent=[]; S.weights=[]; S.weekOffset=0; S.reportSeen=[];
   S.reminders=[]; S.mealRemindersEnabled=false; S.weightReminder={enabled:false,weekday:1,time:'09:00'};
+  S.waterReminder={enabled:false,intervalMinutes:120};
   saveState(); renderAll(); toast('Data cleared');
 };
 
@@ -2890,17 +3205,41 @@ function startMealScan(type){
 $$('#seg button, #tabbar .tb').forEach(b=>b.onclick=()=>switchView(b.dataset.v));
 $('#fabScan').onclick = () => { switchView('scan'); setTimeout(()=>$('#camBtn').focus(),200); };
 
-if(!loadState()) saveState();
-
-function renderAll(){ renderHome(); renderTrain(); renderWeek(); renderRecent(); renderCoach(); renderLibrary(); renderApiStatus(); renderReminders(); saveState(); queueRecapNotificationSync(); }
-renderAll();
-$('#gK').value=S.goals.k; $('#gP').value=S.goals.p; $('#gC').value=S.goals.c; $('#gF').value=S.goals.f;
-$('#bodyW').value=S.weight; $('#setW').value=S.weight; $('#setTW').value=S.targetWeight; $('#setH').value=S.heightCm;
-$('#mealDate').value=TODAY(); $('#mealDate').max=TODAY(); $('#mealTime').value=localTimeValue();
-$('#stepDate').value=TODAY(); $('#stepDate').max=TODAY(); updateStepDateDisplay(); renderStepsCalendar();
-switchView('home');
-scheduleAutomaticRecaps();
-registerRecapNotificationActions();
-if(S.healthConnectEnabled) syncHealthSteps(false);
-checkForAppUpdate();
-if(!S.apiKey) setTimeout(()=>showKeyReminder(),600);
+function renderAll(){ renderHome(); renderTrain(); renderWeek(); renderRecent(); renderCoach(); renderLibrary(); renderApiStatus(); renderReminders(); if(storageInitialized) saveState(); queueRecapNotificationSync(); }
+async function initializeApp(){
+  try{
+    if(!await loadState()&&!await saveState()) throw new Error('Could not initialize tracker storage.');
+    storageInitialized=true;
+    if(window.navigator.storage?.persist){
+      window.navigator.storage.persist().catch(error=>console.warn('Cal could not request persistent storage:',error));
+    }
+  }catch(error){
+    persistenceFailed=true;
+    console.warn('Cal could not initialize tracker storage:',error);
+    toast('Could not load saved data. Restart the app before logging new items.');
+  }
+  renderAll();
+  $('#gK').value=S.goals.k; $('#gP').value=S.goals.p; $('#gC').value=S.goals.c; $('#gF').value=S.goals.f;
+  $('#bodyW').value=S.weight; $('#setW').value=S.weight; $('#setTW').value=S.targetWeight; $('#setH').value=S.heightCm;
+  $('#mealDate').value=TODAY(); $('#mealDate').max=TODAY(); $('#mealTime').value=localTimeValue();
+  $('#stepDate').value=TODAY(); $('#stepDate').max=TODAY(); updateStepDateDisplay(); renderStepsCalendar();
+  switchView('home');
+  scheduleAutomaticRecaps();
+  registerRecapNotificationActions();
+  if(S.healthConnectEnabled) syncHealthSteps(false);
+  if(S.waterReminder.enabled){
+    try{ await refreshWaterReminderNotifications(false); }
+    catch(error){
+      console.warn('Cal could not schedule water reminders:',error);
+      toast(`Could not schedule water reminders: ${error.message}`);
+    }
+  }
+  setInterval(()=>{
+    if(S.waterReminder.enabled&&waterReminderScheduledDay!==TODAY()){
+      refreshWaterReminderNotifications(false).catch(error=>console.warn('Cal could not refresh water reminders:',error));
+    }
+  },60_000);
+  checkForAppUpdate();
+  if(!S.apiKey) setTimeout(()=>showKeyReminder(),600);
+}
+initializeApp();

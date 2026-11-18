@@ -18,10 +18,12 @@ buildscript {
 
 apply from: "variables.gradle"
 
-def localBuildRoot = new File(
-    System.getenv('LOCALAPPDATA') ?: System.getProperty('user.home'),
-    'MyCalAI/AndroidBuild'
-)
+def localBuildRoot = System.getenv('MYCALAI_ANDROID_BUILD_ROOT')
+    ? new File(System.getenv('MYCALAI_ANDROID_BUILD_ROOT'))
+    : new File(
+        System.getenv('LOCALAPPDATA') ?: System.getProperty('user.home'),
+        'MyCalAI/AndroidBuild'
+    )
 
 subprojects {
     project.buildDir = new File(localBuildRoot, project.name)

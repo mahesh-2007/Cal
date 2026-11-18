@@ -12,7 +12,7 @@ copies these files and the required plugin assets into `www/`.
 ## Features
 
 - Log meals using a photo, a meal description, or saved foods. Edit saved meal
-  nutrition and portion sizes, and choose a different portion when logging.
+  nutrition and portion sizes, which automatically scale with the portion.
 - Track calories, macronutrients, workouts, steps, weight, and water.
 - Edit saved workout routines, including sets, reps, and weights.
 - View front/back muscle maps with primary and supporting regions, plus
@@ -27,6 +27,8 @@ copies these files and the required plugin assets into `www/`.
   tagline. Notification permission is requested only when there is recap
   activity to notify you about.
 - Set your daily water target with the pencil button beside the water tracker.
+- Choose recurring water reminder intervals from 30 minutes to 12 hours. Water
+  reminders run from 8 AM to 10 PM and stop for the day when the target is met.
 - Create meal and weight reminders.
 - Optionally connect Health Connect for read-only step tracking.
 - Optionally use Gemini for AI meal analysis and coaching.
@@ -38,10 +40,11 @@ the remaining calorie allowance.
 
 ## Your data and privacy
 
-Tracker information is saved in local storage on this device. It is not
-uploaded to a MyCal account or synced to the cloud. Clearing app data or
-uninstalling the app can erase its local data. Export a backup before moving to
-a new phone or uninstalling.
+Tracker information is saved in the app's on-device IndexedDB storage. It is
+not uploaded to a MyCal account or synced to the cloud. Existing local tracker
+data is migrated automatically the first time an updated app opens. Clearing
+app data or uninstalling the app can erase its local data. Export a backup
+before moving to a new phone or uninstalling.
 
 Use **Settings > Data > Export JSON** to save a backup, and **Import JSON** to
 restore one. Importing replaces the tracker history currently on this device.

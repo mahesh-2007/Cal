@@ -316,6 +316,7 @@ input[type="date"]::-webkit-calendar-picker-indicator,input[type="time"]::-webki
 .meal-reminder-card,.meal-reminder-grid,.meal-reminder-grid .field{min-width:0}
 .meal-reminder-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .meal-reminder-grid input{min-width:0;padding-left:10px;padding-right:10px}
+.water-reminder-toggle input{width:18px;height:18px;flex:0 0 auto;margin:0;padding:0;border:0;border-radius:4px;background:transparent;accent-color:var(--p)}
 .settings-link{color:var(--t1);font-weight:600;text-decoration:none}
 .settings-link:hover{text-decoration:underline}
 .coach-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0}

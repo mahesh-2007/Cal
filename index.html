@@ -677,7 +677,7 @@
         </div>
 
         <div class="card sm">
-          <div class="card-hd" style="margin-bottom:12px"><div class="h5" style="font-size:14px">About MyCal AI</div><span class="badge bg-Pull sp">Stable v1.0.0</span></div>
+          <div class="card-hd" style="margin-bottom:12px"><div class="h5" style="font-size:14px">About MyCal AI</div><span class="badge bg-Pull sp" id="appVersionBadge">Stable v1.0.2</span></div>
           <p class="body" style="font-size:13px">A personal food, movement and weight tracker designed to make everyday health habits easier. Nutrition and activity numbers are estimates, not medical advice.</p>
           <p class="body" style="font-size:13px;margin-top:12px"><b>Conceived by <a class="settings-link" href="https://dev-mahesh-portfolio.web.app/" target="_blank" rel="noopener">Mahesh</a>. Built with AI as a creative co-pilot.</b></p>
           <p class="meta" style="font-size:12px;margin-top:10px"><a class="privacy-link" href="privacypolicy.html" target="_blank" rel="noopener">Privacy policy</a></p>
@@ -734,6 +734,27 @@
       <label class="lbl" for="waterGoalLiters">Target (litres)</label>
       <input type="number" id="waterGoalLiters" min="0.25" max="10" step="0.25" value="2">
     </div>
+    <div style="margin-top:16px">
+      <label class="water-reminder-toggle" for="waterReminderEnabled" style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600">
+        <input type="checkbox" id="waterReminderEnabled">
+        <span>Remind me to drink water every day</span>
+      </label>
+      <div class="field" style="margin-top:12px">
+        <label class="lbl" for="waterReminderInterval">Reminder interval</label>
+        <select id="waterReminderInterval">
+          <option value="30">Every 30 minutes</option>
+          <option value="60">Every 1 hour</option>
+          <option value="90">Every 1.5 hours</option>
+          <option value="120">Every 2 hours</option>
+          <option value="180">Every 3 hours</option>
+          <option value="240">Every 4 hours</option>
+          <option value="360">Every 6 hours</option>
+          <option value="480">Every 8 hours</option>
+          <option value="720">Every 12 hours</option>
+        </select>
+      </div>
+      <p class="meta" style="font-size:12px;margin:8px 0 0">Reminders run from 8 AM to 10 PM and stop for the day when you reach your target.</p>
+    </div>
     <div class="update-actions">
       <button class="btn pri" id="saveWaterGoal">Save</button>
       <button class="btn" id="cancelWaterGoal">Cancel</button>
@@ -767,7 +788,7 @@
     </div>
     <div class="meal-edit-portion">
       <div class="field">
-        <label class="lbl" for="savedMealAmount">Base portion</label>
+        <label class="lbl" for="savedMealAmount">Portion size</label>
         <input id="savedMealAmount" type="number" min="0.1" step="0.1">
       </div>
       <div class="field">
@@ -786,7 +807,7 @@
       <div class="field"><label class="lbl" for="savedMealCarbs">Carbs (g)</label><input id="savedMealCarbs" type="number" min="0" step="0.1"></div>
       <div class="field"><label class="lbl" for="savedMealFat">Fat (g)</label><input id="savedMealFat" type="number" min="0" step="0.1"></div>
     </div>
-    <p class="meta" style="font-size:12px;margin-top:12px">Nutrition values apply to the base portion. Adjust the amount beside a saved meal before logging a different portion.</p>
+    <p class="meta" style="font-size:12px;margin-top:12px">Changing the portion size automatically scales calories, protein, carbs, and fat. You can still edit nutrition values manually.</p>
     <div class="update-actions">
       <button class="btn pri" id="saveSavedMeal">Save changes</button>
       <button class="btn" id="cancelSavedMeal">Cancel</button>
