@@ -184,13 +184,15 @@
             <button class="btn sm ghost sp" id="modeBtn">Text mode</button>
           </div>
           <div class="field">
-            <label class="lbl">Meal type</label>
-            <select id="mealType">
-              <option>Breakfast</option>
-              <option>Lunch</option>
-              <option>Dinner</option>
-              <option>Snack</option>
-            </select>
+            <label class="lbl" for="mealType">Meal type</label>
+            <div class="meal-type-picker">
+              <select id="mealType">
+                <option>Breakfast</option>
+                <option>Lunch</option>
+                <option>Dinner</option>
+                <option>Snack</option>
+              </select>
+            </div>
           </div>
           <div class="field">
             <label class="lbl">Log date</label>
@@ -258,20 +260,6 @@
         <div class="card sm">
           <div id="apiStatus"></div>
         </div>
-        <div class="card sm meal-reminder-card">
-          <div class="card-hd" style="margin-bottom:8px"><div class="h5">Meal reminders</div></div>
-          <p class="meta" style="font-size:12px;margin-bottom:12px">Choose a daily time for each meal and snack.</p>
-          <div class="meal-reminder-grid">
-            <div class="field" style="margin:0"><label class="lbl" for="mealReminderBreakfast">Breakfast</label><input type="time" id="mealReminderBreakfast" value="08:00"></div>
-            <div class="field" style="margin:0"><label class="lbl" for="mealReminderLunch">Lunch</label><input type="time" id="mealReminderLunch" value="13:00"></div>
-            <div class="field" style="margin:0"><label class="lbl" for="mealReminderDinner">Dinner</label><input type="time" id="mealReminderDinner" value="19:00"></div>
-            <div class="field" style="margin:0"><label class="lbl" for="mealReminderSnack">Snack</label><input type="time" id="mealReminderSnack" value="16:00"></div>
-          </div>
-          <button class="btn sm pri full" id="saveMealReminders" style="margin-top:12px">Enable daily reminders</button>
-          <button class="btn sm full" id="disableMealReminders" style="margin-top:8px;display:none">Turn off meal reminders</button>
-          <div id="reminderList" class="rows" style="margin-top:10px"></div>
-          <button class="btn sm full" style="margin-top:8px" onclick="go('coach')">Create a reminder with Cal</button>
-        </div>
         <div class="card">
           <div class="card-hd" style="margin-bottom:10px"><div class="h5" style="font-size:14px">Recent scans</div></div>
           <div class="rows" id="recentList"></div>
@@ -286,6 +274,10 @@
       <div class="stack">
         <div class="card lg">
           <div class="card-hd"><div class="h4">Log a session</div></div>
+          <div class="field" style="margin-top:14px">
+            <label class="lbl" for="workoutDate">Workout date</label>
+            <input type="date" id="workoutDate">
+          </div>
           <div class="lbl" style="margin-bottom:10px">Split</div>
           <div class="splits" id="splits">
             <div class="split-option" data-t="Push"><div class="nm">Push</div><div class="ds">Chest · Shoulders · Triceps</div></div>
@@ -299,11 +291,12 @@
             <div class="card-hd" style="margin-bottom:10px"><div class="h5" style="font-size:15px">Exercise details</div><span class="meta" id="exerciseHint">Choose a split first</span></div>
             <div class="exercise-entry">
               <div class="field"><label class="lbl">Exercise</label><input id="exName" placeholder="Bench press"></div>
-              <div class="field"><label class="lbl">Sets</label><input type="text" inputmode="numeric" id="exSets" placeholder="4"></div>
-              <div class="field"><label class="lbl">Reps</label><input type="text" inputmode="numeric" id="exReps" placeholder="8"></div>
-              <div class="field"><label class="lbl">Weight kg</label><input type="text" inputmode="decimal" id="exWeight" placeholder="60"></div>
+              <div class="field"><label class="lbl">Sets</label><input type="number" inputmode="numeric" id="exSets" placeholder="4" min="1" max="30" step="1"></div>
+              <div class="field"><label class="lbl">Default reps</label><input type="number" inputmode="numeric" id="exReps" placeholder="8" min="1" step="1"></div>
+              <div class="field"><label class="lbl">Default kg</label><input type="number" inputmode="decimal" id="exWeight" placeholder="60" min="0" step="0.5"></div>
               <button class="btn sm pri" id="addExercise" title="Add exercise">+</button>
             </div>
+            <div class="set-inputs" id="setInputs"></div>
             <div class="exercise-list" id="exerciseList"></div>
             <div class="routine-save">
               <input id="routineName" placeholder="Routine name, e.g. Push A">
@@ -382,6 +375,26 @@
           <div class="card-hd" style="margin-bottom:8px"><div class="h5" style="font-size:14px">Strength &amp; muscles</div></div>
           <label class="lbl strength-label" for="strengthExercise">Track exercise</label>
           <select id="strengthExercise" aria-label="Exercise strength trend"></select>
+          <div class="strength-exercise-actions">
+            <button class="btn sm" type="button" id="renameTrackedExercise">Rename exercise</button>
+            <button class="btn sm dan" type="button" id="deleteTrackedExercise">Delete exercise</button>
+          </div>
+          <div class="strength-exercise-panel" id="renameTrackedExercisePanel" hidden>
+            <label class="lbl" for="renameTrackedExerciseInput">New exercise name</label>
+            <input id="renameTrackedExerciseInput" maxlength="80">
+            <div class="btn-row">
+              <button class="btn sm pri" type="button" id="saveTrackedExerciseName">Save name</button>
+              <button class="btn sm" type="button" id="cancelTrackedExerciseRename">Cancel</button>
+            </div>
+          </div>
+          <div class="strength-exercise-panel delete" id="deleteTrackedExercisePanel" hidden>
+            <p class="meta" id="deleteTrackedExerciseMessage"></p>
+            <div class="btn-row">
+              <button class="btn sm dan" type="button" id="confirmDeleteTrackedExercise">Delete exercise</button>
+              <button class="btn sm" type="button" id="cancelDeleteTrackedExercise">Cancel</button>
+            </div>
+          </div>
+          <p class="meta strength-exercise-help">Renaming updates workout history and saved routines. Deleting removes this exercise from both.</p>
           <div class="muscle-focus">
             <div class="muscle-maps" aria-label="Estimated muscle activation map">
               <div class="muscle-map"><div class="muscle-map-title">Front</div><div class="muscle-chart" id="muscleFront"></div></div>
@@ -560,6 +573,10 @@
       <div class="card">
         <div class="card-hd"><div class="h4">Saved meals</div><span class="meta sp" id="savedCount"></span></div>
         <p class="body" style="font-size:13px;margin-bottom:14px">Edit saved nutrition and portion units, then choose the amount to log.</p>
+        <div class="field saved-meal-search">
+          <label class="sr-only" for="savedMealSearch">Search saved meals</label>
+          <input type="search" id="savedMealSearch" placeholder="Search saved meals" autocomplete="off">
+        </div>
         <div class="rows" id="savedList"></div>
       </div>
       <div class="card sm">
@@ -646,6 +663,47 @@
           </div>
         </div>
 
+        <div class="card sm meal-reminder-card">
+          <div class="card-hd" style="margin-bottom:8px"><div class="h5">Meal reminders</div></div>
+          <p class="meta" style="font-size:12px;margin-bottom:12px">Choose a daily time for each meal and snack.</p>
+          <div class="meal-reminder-grid">
+            <div class="field" style="margin:0"><label class="lbl" for="mealReminderBreakfast">Breakfast</label><input type="time" id="mealReminderBreakfast" value="08:00"></div>
+            <div class="field" style="margin:0"><label class="lbl" for="mealReminderLunch">Lunch</label><input type="time" id="mealReminderLunch" value="13:00"></div>
+            <div class="field" style="margin:0"><label class="lbl" for="mealReminderDinner">Dinner</label><input type="time" id="mealReminderDinner" value="19:00"></div>
+            <div class="field" style="margin:0"><label class="lbl" for="mealReminderSnack">Snack</label><input type="time" id="mealReminderSnack" value="16:00"></div>
+          </div>
+          <button class="btn sm pri full" id="saveMealReminders" style="margin-top:12px">Enable daily reminders</button>
+          <button class="btn sm full" id="disableMealReminders" style="margin-top:8px;display:none">Turn off meal reminders</button>
+          <div id="reminderList" class="rows" style="margin-top:10px"></div>
+          <div class="divider"></div>
+          <div class="h5" style="font-size:14px;margin-bottom:8px">Custom reminder</div>
+          <p class="meta" style="font-size:12px;margin-bottom:12px">Write your own reminder or ask Cal to create one. New reminders default to 9:00 AM.</p>
+          <div class="field">
+            <label class="lbl" for="customReminderTitle">What should we remind you about?</label>
+            <input id="customReminderTitle" maxlength="100" placeholder="Take a walk">
+          </div>
+          <div class="f2">
+            <div class="field" style="margin:0">
+              <label class="lbl" for="customReminderFrequency">Repeat</label>
+              <select id="customReminderFrequency"><option value="daily">Every day</option><option value="weekly">Every week</option></select>
+            </div>
+            <div class="field" style="margin:0">
+              <label class="lbl" for="customReminderTime">Time</label>
+              <input type="time" id="customReminderTime" value="09:00">
+            </div>
+          </div>
+          <div class="field" id="customReminderWeekdayField" style="display:none;margin-top:12px">
+            <label class="lbl" for="customReminderWeekday">Day</label>
+            <select id="customReminderWeekday">
+              <option value="1">Sunday</option><option value="2">Monday</option><option value="3">Tuesday</option>
+              <option value="4">Wednesday</option><option value="5">Thursday</option><option value="6">Friday</option>
+              <option value="7">Saturday</option>
+            </select>
+          </div>
+          <button class="btn sm pri full" id="saveCustomReminder" style="margin-top:12px">Set custom reminder</button>
+          <button class="btn sm full" style="margin-top:8px" onclick="go('coach')">Ask Cal to create a reminder</button>
+        </div>
+
         <div class="card sm">
           <div class="card-hd" style="margin-bottom:8px"><div class="h5" style="font-size:14px">Weight reminder</div></div>
           <p class="meta" style="font-size:12px;margin-bottom:12px">Choose when to check in. This repeats every week.</p>
@@ -677,7 +735,7 @@
         </div>
 
         <div class="card sm">
-          <div class="card-hd" style="margin-bottom:12px"><div class="h5" style="font-size:14px">About MyCal AI</div><span class="badge bg-Pull sp" id="appVersionBadge">Stable v1.0.2</span></div>
+          <div class="card-hd" style="margin-bottom:12px"><div class="h5" style="font-size:14px">About MyCal AI</div><span class="badge bg-Pull sp" id="appVersionBadge">Stable v1.0.3</span></div>
           <p class="body" style="font-size:13px">A personal food, movement and weight tracker designed to make everyday health habits easier. Nutrition and activity numbers are estimates, not medical advice.</p>
           <p class="body" style="font-size:13px;margin-top:12px"><b>Conceived by <a class="settings-link" href="https://dev-mahesh-portfolio.web.app/" target="_blank" rel="noopener">Mahesh</a>. Built with AI as a creative co-pilot.</b></p>
           <p class="meta" style="font-size:12px;margin-top:10px"><a class="privacy-link" href="privacypolicy.html" target="_blank" rel="noopener">Privacy policy</a></p>

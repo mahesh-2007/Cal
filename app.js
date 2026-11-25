@@ -608,7 +608,34 @@ function displayFoodName(name){
   return `${match?match[1]:''}${FOOD_DISPLAY_NAMES.get(label.toLowerCase())||label}`;
 }
 function displayMealName(name){
-  return String(name||'Meal').split(/\s*,\s*/).map(displayFoodName).join(', ');
+  const parts=String(name||'Meal').split(/\s*,\s*/).map(part=>
+    displayFoodName(part).replace(/^\s*\d+(?:\.\d+)?\s*[×x]\s*/i,'').trim()
+  ).filter(Boolean);
+  if(parts.length<=1){
+    const title=parts[0]||'Meal';
+    const combined=title.match(/^(.+?)\s*&\s*(.+?)(?:\s+plate)?$/i);
+    if(combined){
+      const firstWords=new Set(combined[1].toLowerCase().split(/\s+/));
+      if(combined[2].toLowerCase().split(/\s+/).some(word=>firstWords.has(word))) return combined[1];
+    }
+    return title;
+  }
+  const firstWords=new Set(parts[0].toLowerCase().split(/\s+/));
+  if(parts[1].toLowerCase().split(/\s+/).some(word=>firstWords.has(word))) return parts[0];
+  return parts.length===2?`${parts[0]} & ${parts[1]}`:`${parts[0]} & ${parts[1]} plate`;
+}
+function conciseMealHeading(name,items=[]){
+  const heading=String(name||'').replace(/\s+/g,' ').trim();
+  if(heading&&heading.length<=48&&!heading.includes(',')) return displayMealName(heading);
+  const names=[...new Set(items.map(item=>displayFoodName(item.name)).filter(Boolean))];
+  if(names.length===1) return names[0];
+  if(names.length>1){
+    const firstWords=new Set(names[0].toLowerCase().split(/\s+/));
+    if(names[1].toLowerCase().split(/\s+/).some(word=>firstWords.has(word))) return names[0];
+  }
+  if(names.length===2) return `${names[0]} & ${names[1]}`;
+  if(names.length>2) return `${names[0]} & ${names[1]} plate`;
+  return 'Meal';
 }
 function mealNameKey(name){
   return String(name||'').split(/\s*,\s*/).map(part=>displayFoodName(part).toLowerCase()).filter(Boolean).sort().join(',');
@@ -626,7 +653,7 @@ let geminiKeyVerified = false;
 const PROMPT = `You are a nutrition estimator. Analyze the food described or shown.
 Return ONLY minified JSON, no markdown, no code fences, matching exactly:
 {"isFood":true,"mealName":"string","confidence":"high|medium|low","items":[{"name":"string","quantity":"string","grams":number,"kcal":number,"protein":number,"carbs":number,"fat":number}],"total":{"kcal":number,"protein":number,"carbs":number,"fat":number},"note":"one short practical note about this meal"}
-Rules: identify each distinct food separately. Estimate a realistic single serving. If the user provides a description with a photo, use it as additional context for ingredients, preparation and portion size; prioritize explicit quantities in the description when estimating.
+Rules: identify each distinct food separately. Estimate a realistic single serving. Give mealName a simple, clear heading of 2–5 words (for example "Chicken and rice" or "Paneer curry"), not a comma-separated ingredient list, quantities, or nutrition numbers. If the user provides a description with a photo, use it as additional context for ingredients, preparation and portion size; prioritize explicit quantities in the description when estimating.
 Use precise portion units: drinks and liquids in ml (for example 250 ml), rice, curry, oats and meat in grams (for example 180 g), and countable foods such as idli, eggs, roti, dosa, naan and slices in pieces (for example 3 pieces). Put the same unit in quantity and use grams for the numeric grams field when applicable.
 If the image clearly contains no food, set isFood false and items to [].
 Numbers are integers except protein/carbs/fat which may have one decimal.`;
@@ -847,7 +874,8 @@ function renderHome(){
     box.innerHTML = `        <div class="card-hd"><div class="h5">Today's session</div><span class="badge bg-${workoutClass(w.type)} sp">${esc(w.type)}</span></div>
     <div class="lic"><span class="k">Duration</span><span class="v">${w.min} min</span></div>
     <div class="lic"><span class="k">Intensity</span><span class="v">${w.intensity}×</span></div>
-      ${w.exercises?.length?`<p class="body" style="font-size:13px;margin-top:12px"><b>${w.exercises.length} exercise${w.exercises.length===1?'':'s'}:</b> ${w.exercises.map(x=>`${esc(x.name)} ${x.sets}×${x.reps} @ ${x.weight}kg`).join(' · ')}</p>`:''}
+      ${w.name?`<p class="meta" style="font-size:12px;margin-top:8px">${esc(w.name)}</p>`:''}
+      ${w.exercises?.length?`<p class="body" style="font-size:13px;margin-top:12px"><b>${w.exercises.length} exercise${w.exercises.length===1?'':'s'}:</b> ${w.exercises.map(x=>`${esc(x.name)} (${exerciseSetDetails(x).map(set=>`${set.reps}×${set.weight}kg`).join(', ')})`).join(' · ')}</p>`:''}
       ${w.notes?`<p class="body" style="font-size:13px;margin-top:12px">${esc(w.notes)}</p>`:''}
       <div class="btn-row" style="margin-top:16px">
         <button class="btn sm full" onclick="editTodayWorkout()">Edit</button>
@@ -882,6 +910,9 @@ function renderHome(){
     const rows=meals.length ? meals.map(({meal,index})=>{
       const saved=S.saved.some(item=>mealNameKey(item.name)===mealNameKey(meal.name));
       const displayName=displayMealName(meal.name);
+      const currentType=String(meal.type||'Snack');
+      const mealTypes=['Breakfast','Lunch','Dinner','Snack'];
+      const mealTypeOptions=mealTypes.includes(currentType)?mealTypes:[...mealTypes,currentType];
       const macroBadge=(label,value,tone)=>`<span class="meal-macro ${tone}"><span class="label">${label}</span><span class="value">${Math.round(value)}g</span></span>`;
       return `
       <div class="row logged-meal">
@@ -889,7 +920,8 @@ function renderHome(){
         <div class="main">
           <div class="nm meal-name" title="${esc(displayName)}">${esc(displayName)}</div>
           <div class="meal-detail">${macroBadge('P',meal.protein,'p')}${macroBadge('C',meal.carbs,'c')}${macroBadge('F',meal.fat,'f')}</div>
-          <div class="meal-meta">${meal.portion?`${esc(meal.portion)} · `:''}${esc(meal.type||'Snack')} · ${esc(meal.at||'')}${meal.src==='photo'?' · photo':meal.src==='text'?' · text':''}</div>
+          <div class="meal-meta">${meal.portion?`${esc(meal.portion)} · `:''}${esc(meal.at||'')}${meal.src==='photo'?' · photo':meal.src==='text'?' · text':''}</div>
+          <label class="meal-type-control"><span>Meal type</span><select aria-label="Move ${esc(displayName)} to another meal" onchange="moveMealCategory(${index},this.value)">${mealTypeOptions.map(type=>`<option value="${esc(type)}"${currentType.toLowerCase()===type.toLowerCase()?' selected':''}>${esc(type)}</option>`).join('')}</select></label>
         </div>
         <div class="meal-calories"><div class="value">${num(meal.kcal)}</div><div class="unit">kcal</div></div>
         <div class="meal-actions">
@@ -958,7 +990,14 @@ function renderHome(){
   renderApiStatus();
 }
 window.delMeal = i => { today().meals.splice(i,1); renderAll(); toast('Meal removed'); };
-window.delWo = () => { today().workout=null; renderAll(); toast('Workout removed'); };
+window.moveMealCategory = (i,type) => {
+  const meal=today().meals[i];
+  if(!meal||!['Breakfast','Lunch','Dinner','Snack'].includes(type)) return;
+  meal.type=type;
+  renderAll();
+  toast(`Meal moved to ${type}`);
+};
+window.delWo = () => window.deleteWorkout(TODAY());
 window.saveMeal = i => {
   const m = {...today().meals[i]};
   m.name=displayMealName(m.name);
@@ -1091,6 +1130,7 @@ async function runAnalyze(imageB64, text){
       data = localAnalyze(text);
       data.note = data.note + ' (Offline estimator — no API key set.)';
     }
+    data.mealName=conciseMealHeading(data.mealName,data.items);
     result = data;
     renderResult();
   }catch(e){
@@ -1105,6 +1145,7 @@ async function runAnalyze(imageB64, text){
         showKeyReminder('Gemini rejected the saved API key.',true);
       }
       result = localAnalyze(text);
+      result.mealName=conciseMealHeading(result.mealName,result.items);
       result.note = `Gemini call failed (${e.message}). Showing an offline estimate.`;
       renderResult();
     } else {
@@ -1201,7 +1242,7 @@ window.bump = (i, d) => {
 };
 window.discard = () => { $('#resultCard').style.display='none'; result=null; pendingImg=null; $('#prev').style.display='none'; $('#scanBtn').disabled=true; };
 function resultMealName(){
-  return result.items.map(i=>displayFoodName((i.qty&&i.qty!==1)?`${i.qty}× ${i.name}`:i.name)).join(', ') || displayMealName(result.mealName);
+  return conciseMealHeading(result.mealName,result.items);
 }
 function resultMealData(){
   const t=result.total;
@@ -1274,45 +1315,90 @@ function renderRoutineList(){
   list.innerHTML=S.routines.length ? S.routines.map((r,i)=>`<div class="routine-row"><div class="name">${esc(r.name)}</div><span class="meta">${esc(r.type)} · ${r.exercises.length} exercises</span><button class="btn sm" onclick="loadRoutine(${i})">Load</button><button class="btn sm ghost" onclick="deleteRoutine(${i})">Delete</button></div>`).join('') : '';
 }
 let editingRoutineIndex = null;
+let editingWorkoutDate = null;
+function exerciseSetDetails(exercise){
+  if(Array.isArray(exercise.setDetails)&&exercise.setDetails.length){
+    return exercise.setDetails.map(set=>({reps:Number(set.reps)||1,weight:Number(set.weight)||0}));
+  }
+  const count=Math.max(1,Math.min(30,Math.round(Number(exercise.sets)||1)));
+  return Array.from({length:count},()=>({reps:Math.max(1,Math.round(Number(exercise.reps)||1)),weight:Math.max(0,Number(exercise.weight)||0)}));
+}
+function renderSetInputs(){
+  const box=$('#setInputs');
+  if(!box) return;
+  const count=Math.max(0,Math.min(30,Math.round(Number($('#exSets').value)||0)));
+  if(!count){ box.innerHTML=''; return; }
+  const reps=Math.max(1,Math.round(Number($('#exReps').value)||8));
+  const weight=Math.max(0,Number($('#exWeight').value)||0);
+  box.innerHTML=`<div class="set-input-heading">Set details <span>Adjust reps and weight for each set</span></div>`+
+    Array.from({length:count},(_,i)=>`<div class="set-input-row">
+      <span>Set ${i+1}</span>
+      <label>Reps<input type="number" min="1" step="1" value="${reps}" data-set-reps="${i}" aria-label="Set ${i+1} reps"></label>
+      <label>kg<input type="number" min="0" step="0.5" value="${weight}" data-set-weight="${i}" aria-label="Set ${i+1} weight in kilograms"></label>
+    </div>`).join('');
+}
 function renderExerciseDraft(){
   const box = $('#exerciseLog');
   if(!box) return;
   box.classList.toggle('on', !!pick);
   if(!pick) return;
   $('#exerciseHint').textContent = `${pick} · ${exerciseDraft.length} exercise${exerciseDraft.length===1?'':'s'}`;
-  $('#exerciseList').innerHTML = exerciseDraft.length ? `<div class="exercise-row exercise-row-labels"><span>Exercise</span><span>Sets</span><span>Reps</span><span>kg</span><span></span></div>`+exerciseDraft.map((x,i)=>`
-    <div class="exercise-row">
-      <div class="name">${esc(x.name)}</div>
-      <input type="number" min="1" step="1" value="${Number(x.sets)||1}" aria-label="${esc(x.name)} sets" onchange="updateExercise(${i},'sets',this.value)">
-      <input type="number" min="1" step="1" value="${Number(x.reps)||1}" aria-label="${esc(x.name)} reps" onchange="updateExercise(${i},'reps',this.value)">
-      <input type="number" min="0" step="0.5" value="${Number(x.weight)||0}" aria-label="${esc(x.name)} weight in kilograms" onchange="updateExercise(${i},'weight',this.value)">
-      <button class="btn sm ghost" title="Remove exercise" aria-label="Remove ${esc(x.name)}" onclick="removeExercise(${i})">Delete</button>
-    </div>`).join('') : '<div class="empty" style="padding:16px 0"><div class="tx">Add the exercises you performed</div></div>';
+  $('#exerciseList').innerHTML = exerciseDraft.length ? exerciseDraft.map((x,i)=>{
+    const sets=exerciseSetDetails(x);
+    return `<div class="exercise-item">
+      <div class="exercise-row">
+        <div class="name">${esc(x.name)}</div>
+        <span class="exercise-set-count">${sets.length} sets</span>
+        <button class="btn sm ghost" title="Remove exercise" aria-label="Remove ${esc(x.name)}" onclick="removeExercise(${i})">Delete</button>
+      </div>
+      <details class="exercise-set-details"><summary>View or edit each set</summary>
+        <div class="set-detail-list">${sets.map((set,setIndex)=>`<div class="set-detail-row">
+          <span>Set ${setIndex+1}</span>
+          <label>Reps<input type="number" min="1" step="1" value="${set.reps}" aria-label="${esc(x.name)} set ${setIndex+1} reps" onchange="updateExerciseSet(${i},${setIndex},'reps',this.value)"></label>
+          <label>kg<input type="number" min="0" step="0.5" value="${set.weight}" aria-label="${esc(x.name)} set ${setIndex+1} weight in kilograms" onchange="updateExerciseSet(${i},${setIndex},'weight',this.value)"></label>
+        </div>`).join('')}</div>
+      </details>
+    </div>`;
+  }).join('') : '<div class="empty" style="padding:16px 0"><div class="tx">Add the exercises you performed</div></div>';
   $('#saveRoutine').textContent=editingRoutineIndex===null?'Save routine':'Update routine';
   renderRoutineList();
 }
 function addExercise(){
-  const name=cleanExerciseName($('#exName').value), sets=Number($('#exSets').value), reps=Number($('#exReps').value), weight=Number($('#exWeight').value);
-  if(!name || !sets || !reps || weight<0){ toast('Add exercise, sets, reps and weight'); return; }
-  exerciseDraft.push({name,sets:Math.round(sets),reps:Math.round(reps),weight:+weight.toFixed(1)});
+  const name=cleanExerciseName($('#exName').value), sets=Number($('#exSets').value);
+  const setDetails=$$('#setInputs [data-set-reps]').map((input,index)=>({
+    reps:Number(input.value),weight:Number($(`#setInputs [data-set-weight="${index}"]`)?.value)
+  }));
+  if(!name || !Number.isInteger(sets)||sets<1||sets>30||setDetails.length!==sets||
+    setDetails.some(set=>!Number.isInteger(set.reps)||set.reps<1||!Number.isFinite(set.weight)||set.weight<0)){
+    toast('Add an exercise and valid reps and weight for every set'); return;
+  }
+  const reps=Math.round(setDetails.reduce((sum,set)=>sum+set.reps,0)/sets);
+  const weight=Number((setDetails.reduce((sum,set)=>sum+set.weight,0)/sets).toFixed(1));
+  exerciseDraft.push({name,sets,reps,weight,setDetails});
   ['exName','exSets','exReps','exWeight'].forEach(id=>$('#'+id).value='');
+  renderSetInputs();
   renderExerciseDraft();
 }
-window.updateExercise = (i,key,raw) => {
+window.updateExerciseSet = (i,setIndex,key,raw) => {
   const value=Number(raw);
-  if(!exerciseDraft[i]||!Number.isFinite(value)||value<0||(key!=='weight'&&value<1)){
+  const details=exerciseDraft[i]&&exerciseSetDetails(exerciseDraft[i]);
+  if(!details||!details[setIndex]||!Number.isFinite(value)||value<0||(key!=='weight'&&(!Number.isInteger(value)||value<1))){
     toast(key==='weight'?'Weight must be zero or more.':'Sets and reps must be at least one.');
     renderExerciseDraft();
     return;
   }
-  exerciseDraft[i][key]=key==='weight'?Number(value.toFixed(1)):Math.round(value);
+  details[setIndex][key]=key==='weight'?Number(value.toFixed(1)):value;
+  const exercise=exerciseDraft[i];
+  exercise.setDetails=details;
+  exercise.reps=Math.round(details.reduce((sum,set)=>sum+set.reps,0)/details.length);
+  exercise.weight=Number((details.reduce((sum,set)=>sum+set.weight,0)/details.length).toFixed(1));
 };
 window.removeExercise = i => { exerciseDraft.splice(i,1); renderExerciseDraft(); };
 window.loadRoutine = i => {
   const routine=S.routines[i];
   if(!routine) return;
   editingRoutineIndex=i;
-  pick=routine.type; exerciseDraft=routine.exercises.map(x=>({...x,name:cleanExerciseName(x.name)}));
+  pick=routine.type; exerciseDraft=routine.exercises.map(x=>({...x,name:cleanExerciseName(x.name),setDetails:exerciseSetDetails(x)}));
   $('#routineName').value=routine.name;
   $$('#splits .split-option').forEach(x=>x.classList.toggle('on',x.dataset.t===pick));
   renderExerciseDraft(); toast(`${routine.name} loaded`,'✓');
@@ -1322,8 +1408,8 @@ $$('#splits .split-option').forEach(b=>b.onclick=()=>{
   pick = b.dataset.t;
   editingRoutineIndex=null;
   $('#routineName').value='';
-  const current = today().workout;
-  exerciseDraft = current && current.type===pick ? [...(current.exercises||[])] : [];
+  const current = S.days[$('#workoutDate').value||TODAY()]?.workout;
+  exerciseDraft = current && current.type===pick ? (current.exercises||[]).map(x=>({...x,setDetails:exerciseSetDetails(x)})) : [];
   $$('#splits .split-option').forEach(x=>x.classList.toggle('on', x===b));
   renderExerciseDraft();
 });
@@ -1332,14 +1418,46 @@ $('#saveRoutine').onclick=()=>{
   const name=$('#routineName').value.trim() || `${pick||'Workout'} routine`;
   if(!pick || !exerciseDraft.length){ toast('Add exercises before saving a routine'); return; }
   if(S.routines.some((x,i)=>i!==editingRoutineIndex&&x.name.toLowerCase()===name.toLowerCase())){ toast('That routine already exists'); return; }
-  const routine={name,type:pick,exercises:exerciseDraft.map(x=>({...x,name:cleanExerciseName(x.name)}))};
+  const routine={name,type:pick,exercises:exerciseDraft.map(x=>({...x,name:cleanExerciseName(x.name),setDetails:exerciseSetDetails(x)}))};
   if(editingRoutineIndex===null) S.routines.push(routine);
   else S.routines[editingRoutineIndex]=routine;
   editingRoutineIndex=null;
   $('#routineName').value=''; saveState(); renderExerciseDraft(); toast('Routine saved');
 };
 ['exName','exSets','exReps','exWeight'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{if(e.key==='Enter') addExercise();}));
-$('#strengthExercise').onchange=renderStrength;
+$('#exSets').addEventListener('input',renderSetInputs);
+$('#exReps').addEventListener('input',()=>{
+  const value=Math.max(1,Math.round(Number($('#exReps').value)||8));
+  $$('#setInputs [data-set-reps]').forEach(input=>input.value=value);
+});
+$('#exWeight').addEventListener('input',()=>{
+  const value=Math.max(0,Number($('#exWeight').value)||0);
+  $$('#setInputs [data-set-weight]').forEach(input=>input.value=value);
+});
+$('#workoutDate').addEventListener('change',()=>{
+  if(pick) return;
+  const date=$('#workoutDate').value;
+  const workout=date&&S.days[date]?.workout;
+  if(workout){
+    editingWorkoutDate=date;
+    pick=workout.type;
+    exerciseDraft=(workout.exercises||[]).map(x=>({...x,setDetails:exerciseSetDetails(x)}));
+    $('#manMin').value=workout.min;
+    $('#intensity').value=String(workout.intensity||1.35);
+    $('#notes').value=workout.notes||'';
+    $$('#splits .split-option').forEach(option=>option.classList.toggle('on',option.dataset.t===pick));
+    renderExerciseDraft();
+  }else{
+    editingWorkoutDate=null;
+    pick=null;
+    exerciseDraft=[];
+    $('#manMin').value='';
+    $('#notes').value='';
+    $$('#splits .split-option').forEach(option=>option.classList.remove('on'));
+    renderExerciseDraft();
+  }
+});
+$('#strengthExercise').onchange=()=>{ hideStrengthExercisePanels(); renderStrength(); };
 const fmtT = s => [Math.floor(s/3600), Math.floor(s%3600/60), s%60].map(v=>String(v).padStart(2,'0')).join(':');
 $('#startBtn').onclick = () => {
   if(!pick){ toast('Pick a workout split first'); return; }
@@ -1364,31 +1482,46 @@ $('#resetBtn').onclick = () => {
 };
 $('#saveWo').onclick = () => {
   if(!pick){ toast('Choose a workout split'); return; }
+  const date=$('#workoutDate').value;
+  if(!date||date>TODAY()){ toast('Choose today or an earlier date for this workout'); return; }
   const manual = parseFloat($('#manMin').value);
   const mins = manual>0 ? manual : Math.round(S.timer.sec/60);
   if(!mins || mins<1){ toast('Start the timer or enter minutes'); return; }
-  if(exerciseDraft.some(x=>!x.name.trim()||Number(x.sets)<1||Number(x.reps)<1||Number(x.weight)<0)){
+  if(exerciseDraft.some(x=>!x.name.trim()||exerciseSetDetails(x).some(set=>!Number.isInteger(Number(set.reps))||Number(set.reps)<1||!Number.isFinite(Number(set.weight))||Number(set.weight)<0))){
     toast('Check each exercise name, set, rep, and weight before saving.');
     return;
   }
+  const targetDay=D(date);
+  if(targetDay.workout&&date!==editingWorkoutDate){
+    toast(`A workout is already logged for ${nice(date)}. Edit it from History instead.`);
+    return;
+  }
   const inten = parseFloat($('#intensity').value);
-  const workout = {type:pick, min:Math.round(mins), intensity:inten, weightKg:S.weight, notes:$('#notes').value.trim(), exercises:exerciseDraft.map(x=>({...x,name:cleanExerciseName(x.name)})),
+  const previousWorkout=date===editingWorkoutDate?targetDay.workout:null;
+  const workout = {type:pick, name:previousWorkout?.name||'', min:Math.round(mins), intensity:inten, weightKg:S.weight, notes:$('#notes').value.trim(), exercises:exerciseDraft.map(x=>({...x,name:cleanExerciseName(x.name),setDetails:exerciseSetDetails(x)})),
                    at:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})};
-  today().workout = workout;
+  if(editingWorkoutDate&&editingWorkoutDate!==date&&S.days[editingWorkoutDate]){
+    S.days[editingWorkoutDate].workout=null;
+  }
+  targetDay.workout = workout;
+  editingWorkoutDate=null;
   clearInterval(S.timer.id); S.timer={on:false,sec:0,id:null,type:pick};
   $('#tBig').textContent='00:00:00'; $('#timerBox').classList.remove('on');
   $('#manMin').value=''; $('#notes').value='';
   exerciseDraft=[]; editingRoutineIndex=null; $('#routineName').value=''; renderExerciseDraft();
+  $('#workoutDate').value=TODAY(); renderSetInputs();
   $('#startBtn').disabled=false; $('#pauseBtn').disabled=true; $('#startBtn').textContent='Start';
   renderAll();
   toast(`${pick} workout saved`);
 };
-window.editTodayWorkout=()=>{
-  const workout=today().workout;
+window.editWorkout=date=>{
+  const workout=D(date).workout;
   if(!workout) return;
+  editingWorkoutDate=date;
+  $('#workoutDate').value=date;
   pick=workout.type;
   editingRoutineIndex=null;
-  exerciseDraft=(workout.exercises||[]).map(exercise=>({...exercise,name:cleanExerciseName(exercise.name)}));
+  exerciseDraft=(workout.exercises||[]).map(exercise=>({...exercise,name:cleanExerciseName(exercise.name),setDetails:exerciseSetDetails(exercise)}));
   $('#manMin').value=workout.min;
   $('#intensity').value=String(workout.intensity||1.35);
   $('#notes').value=workout.notes||'';
@@ -1397,11 +1530,24 @@ window.editTodayWorkout=()=>{
   renderExerciseDraft();
   switchView('train');
 };
+window.editTodayWorkout=()=>window.editWorkout(TODAY());
+window.deleteWorkout=date=>{
+  const workout=S.days[date]?.workout;
+  if(!workout) return;
+  S.days[date].workout=null;
+  if(editingWorkoutDate===date){
+    editingWorkoutDate=null;
+    pick=null;
+    exerciseDraft=[];
+    renderExerciseDraft();
+  }
+  renderAll();
+  toast('Workout removed');
+};
 function weekKeys(off){
   const b = new Date(); b.setDate(b.getDate()+off*7);
-  const dow = (b.getDay()+6)%7;              // Monday = 0
-  const mon = new Date(b); mon.setDate(b.getDate()-dow);
-  return Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return dkey(d); });
+  const sun = new Date(b); sun.setDate(b.getDate()-b.getDay());
+  return Array.from({length:7},(_,i)=>{ const d=new Date(sun); d.setDate(sun.getDate()+i); return dkey(d); });
 }
 function renderTrain(){
   const d = today(), wk = weekKeys(0);
@@ -1413,11 +1559,15 @@ function renderTrain(){
   const rows = Object.keys(S.days).filter(k=>S.days[k].workout).sort().reverse().slice(0,12);
   $('#woHist').innerHTML = rows.length ? rows.map(k=>{
     const w = S.days[k].workout;
-    return `<div class="row">
+    return `<div class="row workout-history-row">
       <div class="aw" aria-hidden="true"></div>
-      <div class="main"><div class="nm" style="font-size:15px">${esc(w.type)} day</div>
+      <div class="main"><div class="nm" style="font-size:15px">${esc(w.name||`${w.type} workout`)}</div>
         <div class="ms">${nice(k)} · ${w.min} min · ${w.exercises?.length||0} exercises</div></div>
       <span class="badge bg-${workoutClass(w.type)}">${esc(w.type)}</span>
+      <div class="workout-history-actions">
+        <button class="btn sm ghost" onclick="editWorkout('${k}')" aria-label="Edit workout from ${nice(k)}">Edit</button>
+        <button class="btn sm dan" onclick="deleteWorkout('${k}')" aria-label="Delete workout from ${nice(k)}">Delete</button>
+      </div>
     </div>`;
   }).join('') : `<div class="empty"><div class="tx">No sessions yet</div></div>`;
   renderStrength();
@@ -1425,11 +1575,15 @@ function renderTrain(){
 function renderStrength(){
   const sessions = Object.keys(S.days).sort().flatMap(k=>{
     const w=S.days[k].workout;
-    return w && w.exercises?.length ? w.exercises.map(x=>({...x,k,type:w.type})) : [];
+    return w && w.exercises?.length ? w.exercises.flatMap(x=>exerciseSetDetails(x).map(set=>({...set,name:x.name,k,type:w.type}))) : [];
   });
   const summary=$('#strengthSummary'), chart=$('#strengthChart');
   if(!sessions.length){
     $('#strengthExercise').innerHTML='<option>No exercise data</option>';
+    $('#strengthExercise').disabled=true;
+    $('#renameTrackedExercise').disabled=true;
+    $('#deleteTrackedExercise').disabled=true;
+    hideStrengthExercisePanels();
     summary.innerHTML='<div class="strength-empty">Add exercises to see strength trends</div>';
     chart.innerHTML='';
     updateMuscleMap([],0);
@@ -1443,12 +1597,15 @@ function renderStrength(){
   const names=[...exerciseNames.keys()].sort((a,b)=>exerciseNames.get(a).localeCompare(exerciseNames.get(b)));
   const select=$('#strengthExercise'), previous=select.value;
   select.innerHTML=names.map(key=>`<option value="${esc(key)}">${esc(exerciseNames.get(key))}</option>`).join('');
+  select.disabled=false;
+  $('#renameTrackedExercise').disabled=false;
+  $('#deleteTrackedExercise').disabled=false;
   select.value=names.includes(previous)?previous:names[0];
-  const selected=sessions.filter(x=>normalizeExerciseName(x.name)===select.value), sets=selected.reduce((a,x)=>a+x.sets,0), reps=selected.reduce((a,x)=>a+x.sets*x.reps,0);
-  const volume=selected.reduce((a,x)=>a+x.sets*x.reps*x.weight,0);
+  const selected=sessions.filter(x=>normalizeExerciseName(x.name)===select.value), sets=selected.length, reps=selected.reduce((a,x)=>a+x.reps,0);
+  const volume=selected.reduce((a,x)=>a+x.reps*x.weight,0);
   const best=selected.reduce((a,x)=>Math.max(a,x.weight*(1+x.reps/30)),0);
   const displayName=exerciseNames.get(select.value);
-  updateMuscleMap(musclesForExercise(displayName),selected[0]?.sets);
+  updateMuscleMap(musclesForExercise(displayName),selected.length);
   const byDay=new Map();
   selected.forEach(x=>{
     const value=x.weight*(1+x.reps/30);
@@ -1474,6 +1631,96 @@ function renderStrength(){
     ${dots}${dateLabels}
   </svg>`;
 }
+function hideStrengthExercisePanels(){
+  $('#renameTrackedExercisePanel').hidden=true;
+  $('#deleteTrackedExercisePanel').hidden=true;
+}
+function eachTrackedExercise(callback){
+  Object.values(S.days).forEach(day=>{
+    if(Array.isArray(day?.workout?.exercises)) day.workout.exercises.forEach(callback);
+  });
+  S.routines.forEach(routine=>{
+    if(Array.isArray(routine?.exercises)) routine.exercises.forEach(callback);
+  });
+}
+function strengthExerciseExists(key,exceptKey){
+  let exists=false;
+  eachTrackedExercise(exercise=>{
+    if(exercise&&normalizeExerciseName(exercise.name)===key&&key!==exceptKey) exists=true;
+  });
+  return exists;
+}
+$('#renameTrackedExercise').onclick=()=>{
+  const select=$('#strengthExercise');
+  if(select.disabled||!select.value) return;
+  $('#deleteTrackedExercisePanel').hidden=true;
+  $('#renameTrackedExerciseInput').value=select.selectedOptions[0]?.textContent||'';
+  $('#renameTrackedExercisePanel').hidden=false;
+  $('#renameTrackedExerciseInput').focus();
+  $('#renameTrackedExerciseInput').select();
+};
+$('#cancelTrackedExerciseRename').onclick=hideStrengthExercisePanels;
+$('#saveTrackedExerciseName').onclick=async()=>{
+  const select=$('#strengthExercise'), oldKey=select.value;
+  const newName=cleanExerciseName($('#renameTrackedExerciseInput').value).slice(0,80);
+  const newKey=normalizeExerciseName(newName);
+  if(!newName){ toast('Enter an exercise name'); return; }
+  if(strengthExerciseExists(newKey,oldKey)){
+    toast('That exercise name is already in use');
+    return;
+  }
+  const changed=[];
+  eachTrackedExercise(exercise=>{
+    if(exercise&&normalizeExerciseName(exercise.name)===oldKey){
+      changed.push({exercise,name:exercise.name});
+      exercise.name=newName;
+    }
+  });
+  if(!changed.length){ toast('No matching exercise entries were found'); return; }
+  if(!await saveState()){
+    changed.forEach(item=>{item.exercise.name=item.name;});
+    return;
+  }
+  select.value=newKey;
+  hideStrengthExercisePanels();
+  renderAll();
+  toast('Exercise renamed in workout history and saved routines');
+};
+$('#deleteTrackedExercise').onclick=()=>{
+  const select=$('#strengthExercise');
+  if(select.disabled||!select.value) return;
+  $('#renameTrackedExercisePanel').hidden=true;
+  const name=select.selectedOptions[0]?.textContent||'this exercise';
+  $('#deleteTrackedExerciseMessage').textContent=`Remove ${name} from all logged workouts and saved routines?`;
+  $('#deleteTrackedExercisePanel').hidden=false;
+};
+$('#cancelDeleteTrackedExercise').onclick=hideStrengthExercisePanels;
+$('#confirmDeleteTrackedExercise').onclick=async()=>{
+  const key=$('#strengthExercise').value;
+  const changed=[];
+  const removeFrom=owner=>{
+    if(!Array.isArray(owner?.exercises)) return;
+    const previous=owner.exercises;
+    const remaining=previous.filter(exercise=>!exercise||normalizeExerciseName(exercise.name)!==key);
+    if(remaining.length!==previous.length){
+      changed.push({owner,exercises:previous});
+      owner.exercises=remaining;
+    }
+  };
+  Object.values(S.days).forEach(day=>{if(day?.workout) removeFrom(day.workout);});
+  S.routines.forEach(removeFrom);
+  if(!changed.length){ toast('No matching exercise entries were found'); return; }
+  if(!await saveState()){
+    changed.forEach(item=>{item.owner.exercises=item.exercises;});
+    return;
+  }
+  hideStrengthExercisePanels();
+  renderAll();
+  toast('Exercise removed from workout history and saved routines');
+};
+$('#renameTrackedExerciseInput').addEventListener('keydown',event=>{
+  if(event.key==='Enter') $('#saveTrackedExerciseName').click();
+});
 function musclesForExercise(name){
   const text=String(name||'').toLowerCase();
   const group=(name,pattern)=>({name,pattern:new RegExp(pattern)});
@@ -1728,7 +1975,7 @@ document.addEventListener('visibilitychange',()=>{
 function renderStepsCalendar(){
   const now=new Date(), month=new Date(now.getFullYear(),now.getMonth()+stepsMonthOffset,1,12);
   const year=month.getFullYear(), monthIndex=month.getMonth(), daysInMonth=new Date(year,monthIndex+1,0).getDate();
-  const leading=(month.getDay()+6)%7, firstOfMonth=dkey(month), lastOfMonth=dkey(new Date(year,monthIndex,daysInMonth,12));
+  const leading=month.getDay(), firstOfMonth=dkey(month), lastOfMonth=dkey(new Date(year,monthIndex,daysInMonth,12));
   $('#stepsMonthLabel').textContent=month.toLocaleDateString('en-US',{month:'long',year:'numeric'});
   let total=0,logged=0;
   Object.keys(S.days).forEach(k=>{
@@ -1738,7 +1985,7 @@ function renderStepsCalendar(){
   });
   $('#stepsMonthTotal').textContent=num(total);
   $('#stepsMonthDays').textContent=logged;
-  const headings=['M','T','W','T','F','S','S'].map(day=>`<div class="day-head">${day}</div>`).join('');
+  const headings=['S','M','T','W','T','F','S'].map(day=>`<div class="day-head">${day}</div>`).join('');
   const blanks=Array.from({length:leading},()=>'<div class="step-day blank" aria-hidden="true"></div>').join('');
   const cells=Array.from({length:daysInMonth},(_,i)=>{
     const day=i+1, k=dkey(new Date(year,monthIndex,day,12)), steps=Number(S.days[k]?.steps)||0;
@@ -1749,7 +1996,7 @@ function renderStepsCalendar(){
   $('#stepsCalendar').innerHTML=headings+blanks+cells;
 }
 function renderWeek(){
-  const keys = weekKeys(S.weekOffset), names=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const keys = weekKeys(S.weekOffset), names=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const tk = TODAY();
   $('#weekRange').textContent =
     `${new Date(keys[0]+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${new Date(keys[6]+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}`
@@ -1819,7 +2066,7 @@ function recapPeriod(kind,now=new Date()){
   const todayDate=new Date(now.getFullYear(),now.getMonth(),now.getDate(),12);
   let start,end,key,title,kicker,heroLabel;
   if(kind==='weekly'){
-    const weekdayOffset=(todayDate.getDay()+6)%7;
+    const weekdayOffset=todayDate.getDay();
     start=new Date(todayDate); start.setDate(todayDate.getDate()-weekdayOffset-7);
     end=new Date(start); end.setDate(start.getDate()+6);
     key=dkey(start);
@@ -1921,8 +2168,8 @@ function recapCandidate(kind,now=new Date()){
 function nextRecapBoundary(kind,now=new Date()){
   const date=new Date(now.getFullYear(),now.getMonth(),now.getDate(),9);
   if(kind==='weekly'){
-    const daysUntilMonday=(8-date.getDay())%7||7;
-    date.setDate(date.getDate()+daysUntilMonday);
+    const daysUntilSunday=(7-date.getDay())%7||7;
+    date.setDate(date.getDate()+daysUntilSunday);
   }else if(kind==='monthly'){
     date.setFullYear(date.getFullYear(),date.getMonth()+1,1);
   }else if(kind==='yearly'){
@@ -2415,8 +2662,13 @@ $('#homeWeightLog').onclick=()=>logWeightValue($('#homeWeightInput').value);
 
 let quickMeals = [];
 function renderLibrary(){
+  const searchInput = $('#savedMealSearch');
+  const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const savedMeals = S.saved
+    .map((meal,index)=>({meal,index}))
+    .filter(({meal})=>String(meal.name||'').toLowerCase().includes(searchQuery));
   $('#savedCount').textContent = S.saved.length ? S.saved.length+' saved' : '';
-  $('#savedList').innerHTML = S.saved.length ? S.saved.map((m,i)=>`
+  $('#savedList').innerHTML = savedMeals.length ? savedMeals.map(({meal:m,index:i})=>`
     <div class="row saved-meal-row">
       <div class="aw" aria-hidden="true"></div>
       <div class="main"><div class="nm" style="font-size:15px">${esc(m.name)}</div>
@@ -2432,7 +2684,9 @@ function renderLibrary(){
       <button class="btn sm ghost" onclick="editSavedMeal(${i})" aria-label="Edit ${esc(m.name)}">Edit</button>
       <button class="btn sm ghost" onclick="unsave(${i})" aria-label="Remove ${esc(m.name)}">Delete</button>
     </div>`).join('')
-    : `<div class="empty"><div class="tx">Save any meal to add it here</div></div>`;
+    : searchQuery
+      ? `<div class="empty"><div class="tx">No saved meals match "${esc(searchInput.value.trim())}"</div></div>`
+      : `<div class="empty"><div class="tx">Save any meal to add it here</div></div>`;
 
   // frequency across all logged days
   const freq = {};
@@ -2454,6 +2708,7 @@ function renderLibrary(){
     </div>`;
   }).join('') : `<div class="empty"><div class="tx">Log meals to build quick additions</div></div>`;
 }
+$('#savedMealSearch').addEventListener('input',renderLibrary);
 window.relog = async i => {
   const m = S.saved[i];
   if(!m) return;
@@ -2831,6 +3086,7 @@ function renderReminders(){
     : 'No weekly weight reminder is set.';
   $('#saveMealReminders').textContent=S.mealRemindersEnabled?'Update daily reminders':'Enable daily reminders';
   $('#disableMealReminders').style.display=S.mealRemindersEnabled?'block':'none';
+  $('#customReminderWeekdayField').style.display=$('#customReminderFrequency').value==='weekly'?'block':'none';
   list.innerHTML=S.reminders.length?S.reminders.map(reminder=>`
     <div class="row" style="gap:8px">
       <div class="main"><div class="nm" style="font-size:13px">${esc(reminder.title)}</div><div class="ms">${esc(reminderText(reminder))}</div></div>
@@ -2838,23 +3094,50 @@ function renderReminders(){
     </div>`).join(''):'<div class="meta" style="font-size:12px;padding:4px 0">No custom reminders yet.</div>';
 }
 
-async function addReminderFromCommand(text){
-  const parsed=parseReminderCommand(text);
-  if(parsed.error) throw new Error(parsed.error);
+async function saveCustomReminder(reminderData){
   await ensureReminderPermission();
   let id=Date.now()%1800000000+1000;
   const reservedIds=new Set([...MEAL_REMINDER_TYPES.map((_,index)=>MEAL_REMINDER_ID+index),WEIGHT_REMINDER_ID,...S.reminders.map(reminder=>reminder.id)]);
   while(reservedIds.has(id)) id=id>=1800001000?1000:id+1;
-  const reminder={id,title:parsed.title,body:`Time to ${parsed.title}`,frequency:parsed.frequency,weekday:parsed.weekday,hour:parsed.hour,minute:parsed.minute};
+  const reminder={id,...reminderData,body:`Time to ${reminderData.title}`};
   await LocalNotifications.schedule({notifications:[{
     id,title:'MyCal AI reminder',body:reminder.body,channelId:'cal-reminders',
     schedule:reminderSchedule(reminder)
   }]});
   S.reminders.push(reminder);
-  if(!await saveState()) throw new Error('The reminder could not be saved on this device.');
+  if(!await saveState()){
+    S.reminders=S.reminders.filter(item=>item.id!==id);
+    await cancelReminderNotifications([id]);
+    throw new Error('The reminder could not be saved on this device.');
+  }
   renderReminders();
   return reminder;
 }
+async function addReminderFromCommand(text){
+  const parsed=parseReminderCommand(text);
+  if(parsed.error) throw new Error(parsed.error);
+  return saveCustomReminder(parsed);
+}
+
+$('#customReminderFrequency').addEventListener('change',renderReminders);
+$('#saveCustomReminder').onclick=async()=>{
+  const title=$('#customReminderTitle').value.trim().replace(/\s+/g,' ').slice(0,100);
+  const frequency=$('#customReminderFrequency').value;
+  const weekday=frequency==='weekly'?Number($('#customReminderWeekday').value):null;
+  const time=$('#customReminderTime').value;
+  if(!title){ toast('Enter what you want to be reminded about'); return; }
+  if(!['daily','weekly'].includes(frequency)||
+    (frequency==='weekly'&&(!Number.isInteger(weekday)||weekday<1||weekday>7))||
+    !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)){
+    toast('Choose a valid repeat schedule and time'); return;
+  }
+  const [hour,minute]=time.split(':').map(Number);
+  try{
+    await saveCustomReminder({title,frequency,weekday,hour,minute});
+    $('#customReminderTitle').value='';
+    toast('Custom reminder is on','✓');
+  }catch(error){ toast(`Could not set reminder: ${error.message}`); }
+};
 
 window.deleteReminder=async id=>{
   try{
@@ -3222,6 +3505,7 @@ async function initializeApp(){
   $('#gK').value=S.goals.k; $('#gP').value=S.goals.p; $('#gC').value=S.goals.c; $('#gF').value=S.goals.f;
   $('#bodyW').value=S.weight; $('#setW').value=S.weight; $('#setTW').value=S.targetWeight; $('#setH').value=S.heightCm;
   $('#mealDate').value=TODAY(); $('#mealDate').max=TODAY(); $('#mealTime').value=localTimeValue();
+  $('#workoutDate').value=TODAY(); $('#workoutDate').max=TODAY();
   $('#stepDate').value=TODAY(); $('#stepDate').max=TODAY(); updateStepDateDisplay(); renderStepsCalendar();
   switchView('home');
   scheduleAutomaticRecaps();
